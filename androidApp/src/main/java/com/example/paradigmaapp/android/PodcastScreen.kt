@@ -98,16 +98,6 @@ fun PodcastScreen() {
             .padding(16.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Título
-        Text(
-            text = "Paradigma App",
-            color = Color(0xFFFFD700),
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center
-        )
-
         // Lista de podcasts
         PodcastList(
             podcasts = podcasts,

@@ -36,12 +36,12 @@ fun AudioPlayer(
             // Fila de controles principales
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp) // Más espacio horizontal
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Botón Play/Pause - Más grande
                 IconButton(
                     onClick = onPlayPauseClick,
-                    modifier = Modifier.size(48.dp) // Tamaño aumentado
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Image(
                         painter = painterResource(
@@ -51,18 +51,18 @@ fun AudioPlayer(
                                 R.mipmap.play
                         ),
                         contentDescription = if (player.isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(32.dp) // Icono más grande
+                        modifier = Modifier.size(32.dp)
                     )
                 }
 
-                // Slider de progreso - Más alto
+                // Slider de progreso
                 Slider(
                     value = progress,
                     onValueChange = onProgressChange,
                     valueRange = 0f..1f,
                     modifier = Modifier
                         .weight(1f)
-                        .height(40.dp), // Altura aumentada
+                        .height(40.dp),
                     colors = SliderDefaults.colors(
                         thumbColor = Color(0xFF555555),
                         activeTrackColor = Color(0xFF555555),
@@ -70,7 +70,7 @@ fun AudioPlayer(
                     )
                 )
 
-                // Tiempo del podcast - Texto más grande
+                // Tiempo del podcast
                 Text(
                     text = "${formatTime(player.currentPosition)} / ${formatTime(player.duration)}",
                     color = Color(0xFF555555),
@@ -78,20 +78,20 @@ fun AudioPlayer(
                     modifier = Modifier.width(60.dp)
                 )
 
-                // Botón de volumen - Más grande
+                // Botón de volumen
                 IconButton(
                     onClick = { showVolumeControls = !showVolumeControls },
-                    modifier = Modifier.size(40.dp) // Tamaño aumentado
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Image(
                         painter = painterResource(R.mipmap.volume),
                         contentDescription = "Volume Control",
-                        modifier = Modifier.size(28.dp) // Icono más grande
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
 
-            // Controles de volumen - Más grandes
+            // Controles de volumen
             if (showVolumeControls) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
