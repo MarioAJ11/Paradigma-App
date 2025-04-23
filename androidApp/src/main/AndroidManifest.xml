@@ -5,7 +5,9 @@
     <application
         android:allowBackup="false"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
+        android:theme="@style/AppTheme"
+        android:icon="@mipmap/logo"
+        android:label="Paradigma Media">
         <activity
             android:name=".MainActivity"
             android:exported="true">
