@@ -3,7 +3,6 @@ package com.example.paradigmaapp.android
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme // Importa MaterialTheme de Material 3.
 
 /**
  * Actividad principal de la aplicación.

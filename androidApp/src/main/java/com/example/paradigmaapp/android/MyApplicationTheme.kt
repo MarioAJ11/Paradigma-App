@@ -12,11 +12,21 @@ import androidx.compose.ui.graphics.Color
  * - primary: Color principal para elementos destacados.
  * - secondary: Color secundario para elementos complementarios.
  * - background: Color de fondo general de la pantalla.
+ * - surface: Color de superficies como tarjetas, paneles, etc.
+ * - onPrimary: Color del texto/iconos sobre el color primario.
+ * - onSecondary: Color del texto/iconos sobre el color secundario.
+ * - onBackground: Color del texto/iconos sobre el color de fondo.
+ * - onSurface: Color del texto/iconos sobre el color de la superficie.
  */
 private val DarkColorScheme = darkColorScheme(
     primary = Color(0xFFFFD700), // Amarillo oro
     secondary = Color(0xFF03DAC6), // Cian (ejemplo, puedes ajustarlo)
-    background = Color.Black // Fondo negro
+    background = Color.Black, // Fondo negro
+    surface = Color.Black,
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
+    onBackground = Color.White,
+    onSurface = Color.White
 )
 
 /**
@@ -24,11 +34,21 @@ private val DarkColorScheme = darkColorScheme(
  * - primary: Color principal.
  * - secondary: Color secundario.
  * - background: Color de fondo general.
+ * - surface: Color de superficies.
+ * - onPrimary: Color del texto/iconos sobre el color primario.
+ * - onSecondary: Color del texto/iconos sobre el color secundario.
+ * - onBackground: Color del texto/iconos sobre el color de fondo.
+ * - onSurface: Color del texto/iconos sobre el color de la superficie.
  */
 private val LightColorScheme = lightColorScheme(
     primary = Color(0xFFFFD700), // Amarillo oro
     secondary = Color(0xFF03DAC6), // Cian (ejemplo, puedes ajustarlo)
-    background = Color.White // Fondo blanco
+    background = Color.White, // Fondo blanco
+    surface = Color.White,
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
+    onBackground = Color.Black,
+    onSurface = Color.Black
 )
 
 /**

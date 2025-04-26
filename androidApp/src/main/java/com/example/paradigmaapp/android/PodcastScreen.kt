@@ -2,15 +2,12 @@ package com.example.paradigmaapp.android
 
 import android.util.Log
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -18,36 +15,34 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.common.Player
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-
-// Constantes de diseño
-val primaryColor = Color(0xFFFFD700) // Amarillo
-val backgroundColor = Color.Black
-val textColor = Color.White // Color del texto principal
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
- * Composable principal que representa la pantalla de Podcasts.
- * Contiene la lista de podcasts y el reproductor de audio.
+ * Composable principal [PodcastScreen] que representa la interfaz de usuario para la visualización
+ * de la lista de podcasts y el control de reproducción de audio.
+ *
+ * Utiliza el [ArchiveService] para la obtención asíncrona de datos de podcasts desde la API
+ * de archive.org y [ExoPlayer] para la gestión de audio.
+ * Implementa una estrategia de carga inicial optimizada para una experiencia de usuario fluida.
  */
 @Composable
 fun PodcastScreen() {
-    // Contexto local para acceder a recursos como el ExoPlayer.
+    // Obtención del contexto local necesario para la inicialización de componentes dependientes del sistema.
     val context = LocalContext.current
-
-    // Instancia del servicio para obtener podcasts de archive.org.
+    // Instancia del servicio [ArchiveService] para la interacción con la API de podcasts.
     val archiveService = remember { ArchiveService() }
-
-    // Estado para almacenar la lista de podcasts obtenida del servicio.
-    var podcasts by remember { mutableStateOf<List<Podcast>>(emptyList()) }
-
-    // Estado para controlar si estamos cargando los podcasts.
-    var isLoading by remember { mutableStateOf(true) }
-
-    // Estado para el podcast seleccionado actualmente.
+    // Estado mutable para la lista inicial de podcasts.
+    var initialPodcasts by remember { mutableStateOf<List<Podcast>>(emptyList()) }
+    // Estado mutable para la visibilidad del indicador de carga inicial.
+    var isLoadingInitial by remember { mutableStateOf(true) }
+    // Estado mutable para el podcast actualmente seleccionado.
     var currentPodcast by remember { mutableStateOf<Podcast?>(null) }
-
-    // Configuración de ExoPlayer.
+    // Instancia de [ExoPlayer] para la reproducción de audio.
     val exoPlayer = remember {
         ExoPlayer.Builder(context)
             .build()
@@ -56,18 +51,21 @@ fun PodcastScreen() {
                     override fun onPlayerError(error: PlaybackException) {
                         Log.e("AUDIO", "Error de reproducción: ${error.errorCodeName} - ${error.message}")
                     }
-                    override fun onPlaybackStateChanged(state: Int) {
-                    }
                 })
             }
     }
-
-    // Estados para el progreso y la duración de la reproducción.
+    // Estado mutable para el progreso de la reproducción.
     var progress by remember { mutableStateOf(0f) }
+    // Estado mutable para la duración total del audio.
     var duration by remember { mutableStateOf(0L) }
+    // Estado mutable para indicar si el audio se está reproduciendo.
     var isPlaying by remember { mutableStateOf(exoPlayer.isPlaying) }
+    // CoroutineScope asociado al ciclo de vida del Composable.
+    val coroutineScope = rememberCoroutineScope()
+    // Job para controlar la corrutina de búsqueda (debounce).
+    var seekJob by remember { mutableStateOf<Job?>(null) }
 
-    // Corrutina para actualizar el progreso del Slider.
+    // Efecto para actualizar el progreso y estado de reproducción.
     LaunchedEffect(exoPlayer.currentPosition, exoPlayer.isPlaying) {
         while (isActive) {
             if (exoPlayer.duration > 0 && (exoPlayer.playbackState == Player.STATE_READY || exoPlayer.playbackState == Player.STATE_BUFFERING || exoPlayer.isPlaying)) {
@@ -78,38 +76,61 @@ fun PodcastScreen() {
                 isPlaying = false
             }
             isPlaying = exoPlayer.isPlaying
-            delay(100)
+            delay(500)
         }
     }
 
-    // Efecto para cargar los podcasts cuando la pantalla se compone.
+    // Efecto para cargar la lista inicial de podcasts y sus detalles.
     LaunchedEffect(Unit) {
-        isLoading = true
-        val fetchedPodcasts = archiveService.fetchAllPodcasts("mario011")
-        podcasts = fetchedPodcasts
-        isLoading = false
+        isLoadingInitial = true
+        val fetchedInitialPodcasts = mutableListOf<Podcast>()
+        var page = 1
+        var totalProcessed = 0
+        var totalAvailable = Int.MAX_VALUE
+        try {
+            while (totalProcessed < totalAvailable && fetchedInitialPodcasts.size < 20) {
+                val response = archiveService.fetchPage("mario011", page)
+                val (podcastsFromPage, total) = archiveService.processSearchResponse(response)
+                totalAvailable = total
+                podcastsFromPage.forEach { podcast ->
+                    fetchedInitialPodcasts.add(podcast)
+                }
+                totalProcessed += podcastsFromPage.size
+                if (totalProcessed < totalAvailable && fetchedInitialPodcasts.size < 20) {
+                    page++
+                    delay(ArchiveService.DELAY_BETWEEN_REQUESTS_MS)
+                }
+            }
+            initialPodcasts = fetchedInitialPodcasts
+            isLoadingInitial = false
 
-        // Auto-reproducir el primero si existe
-        fetchedPodcasts.firstOrNull()?.let {
-            currentPodcast = it
-            exoPlayer.playWhenReady = true
+            coroutineScope.launch(Dispatchers.IO) {
+                val allPodcasts = archiveService.fetchAllPodcasts("mario011")
+                withContext(Dispatchers.Main) {
+                    initialPodcasts = allPodcasts
+                }
+            }
+
+        } catch (e: Exception) {
+            Log.e("PodcastScreen", "Error al obtener lista inicial", e)
+            isLoadingInitial = false
         }
     }
 
-    // Efecto para cargar el audio en ExoPlayer cuando cambia el podcast seleccionado.
+    // Efecto para cargar el audio del podcast seleccionado.
     LaunchedEffect(currentPodcast) {
         currentPodcast?.let { podcast ->
-            exoPlayer.run {
-                stop()
-                clearMediaItems()
-                setMediaItem(MediaItem.fromUri(podcast.url))
-                prepare()
+            if (podcast.url.isNotEmpty()) {
+                exoPlayer.stop()
+                exoPlayer.clearMediaItems()
+                exoPlayer.setMediaItem(MediaItem.fromUri(podcast.url))
+                exoPlayer.prepare()
                 Log.d("AUDIO", "Preparando podcast: ${podcast.title} - URL: ${podcast.url}")
             }
         }
     }
 
-    // Efecto para liberar los recursos de ExoPlayer cuando el Composable se destruye.
+    // Efecto para liberar los recursos de ExoPlayer al destruir el Composable.
     DisposableEffect(Unit) {
         onDispose {
             exoPlayer.release()
@@ -117,35 +138,43 @@ fun PodcastScreen() {
         }
     }
 
-    // Interfaz de usuario principal de la pantalla.
+    // Interfaz de usuario principal.
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundColor)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         when {
-            isLoading -> {
+            isLoadingInitial -> {
                 Box(
-                    modifier = Modifier.fillMaxSize().weight(1f),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = primaryColor)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
-            podcasts.isEmpty() -> {
-                // Mensaje actualizado para mario011
+            initialPodcasts.isEmpty() -> {
                 Box(
-                    modifier = Modifier.fillMaxSize().weight(1f),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No se encontraron podcasts subidos por mario011.", color = textColor, fontSize = 18.sp)
+                    Text(
+                        "No se encontraron podcasts subidos por mario011.",
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 18.sp,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
             else -> {
                 PodcastList(
-                    podcasts = podcasts,
+                    podcasts = initialPodcasts,
                     onPodcastSelected = { podcast ->
                         currentPodcast = podcast
                         exoPlayer.playWhenReady = true
@@ -154,7 +183,6 @@ fun PodcastScreen() {
             }
         }
 
-        // Reproductor de audio
         AudioPlayer(
             player = exoPlayer,
             onPlayPauseClick = {
@@ -166,8 +194,12 @@ fun PodcastScreen() {
             },
             progress = progress,
             onProgressChange = { newProgress ->
-                if (duration > 0) {
-                    exoPlayer.seekTo((newProgress * duration).toLong())
+                seekJob?.cancel()
+                seekJob = coroutineScope.launch {
+                    delay(300)
+                    if (duration > 0) {
+                        exoPlayer.seekTo((newProgress * duration).toLong())
+                    }
                 }
             },
             modifier = Modifier

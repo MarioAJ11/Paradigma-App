@@ -34,76 +34,65 @@ fun AudioPlayer(
     // Estado para controlar la visibilidad de los controles de volumen.
     var showVolumeControls by remember { mutableStateOf(false) }
     // Estado para almacenar el volumen actual del reproductor.
-    // Utilizamos mutableFloatStateOf para estados primitivos de tipo Float.
     var currentVolume by remember { mutableFloatStateOf(player.volume) }
 
     // Card que envuelve el reproductor, dándole un fondo y forma.
     Card(
-        modifier = modifier.fillMaxWidth(), // Asegura que el Card ocupe todo el ancho disponible.
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFD700)), // Color de fondo del Card (Amarillo).
-        shape = RoundedCornerShape(12.dp) // Esquinas redondeadas para el Card.
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+        shape = RoundedCornerShape(12.dp)
     ) {
         // Columna principal que organiza los elementos del reproductor verticalmente.
         Column(
-            modifier = Modifier.padding(1.dp), // Pequeño padding interno.
-            verticalArrangement = Arrangement.spacedBy(4.dp) // Espacio entre los elementos de la columna.
+            modifier = Modifier.padding(1.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Fila de controles principales: Botón Play/Pause, Slider de progreso y Botón de volumen.
+            // Fila de controles principales.
             Row(
-                verticalAlignment = Alignment.CenterVertically, // Alinea verticalmente los elementos al centro de la fila.
-                horizontalArrangement = Arrangement.spacedBy(8.dp) // Espacio horizontal entre los elementos.
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Botón Play/Pause.
                 IconButton(
-                    onClick = onPlayPauseClick, // Asigna la acción onClick proporcionada.
-                    modifier = Modifier.size(48.dp) // Tamaño fijo para el botón.
+                    onClick = onPlayPauseClick,
+                    modifier = Modifier.size(48.dp)
                 ) {
-                    // Imagen del botón, cambia entre play y pause según el estado del reproductor.
                     Image(
-                        painter = painterResource( // Carga la imagen desde los recursos.
-                            id = if (player.isPlaying) // Condición: si está reproduciendo, muestra pause.
+                        painter = painterResource(
+                            id = if (player.isPlaying)
                                 R.mipmap.pause
-                            else // De lo contrario, muestra play.
+                            else
                                 R.mipmap.play
                         ),
-                        contentDescription = if (player.isPlaying) "Pause" else "Play", // Descripción de accesibilidad.
-                        modifier = Modifier.size(32.dp) // Tamaño de la imagen dentro del botón.
+                        contentDescription = if (player.isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(32.dp)
                     )
                 }
 
-                // Slider para mostrar y controlar el progreso de la reproducción.
+                // Slider de progreso.
                 Slider(
-                    value = progress, // Valor actual del slider (proviene del estado).
-                    onValueChange = onProgressChange, // Lambda ejecutada cuando cambia el valor (al arrastrar).
-                    valueRange = 0f..1f, // Rango de valores del slider (de 0 a 1, representando el 0% al 100%).
+                    value = progress,
+                    onValueChange = onProgressChange,
+                    valueRange = 0f..1f,
                     modifier = Modifier
-                        .weight(1f) // Hace que el Slider ocupe todo el espacio horizontal disponible.
-                        .height(40.dp), // Altura fija del Slider.
-                    colors = SliderDefaults.colors( // Colores personalizados para el Slider.
-                        thumbColor = Color(0xFF555555), // Color del "pulgar" (la bolita que arrastras).
-                        activeTrackColor = Color(0xFF555555), // Color de la barra activa (lo que ya se ha reproducido).
-                        inactiveTrackColor = Color(0xFFFFFFFF) // Color de la barra inactiva (lo que falta por reproducir).
+                        .weight(1f)
+                        .height(40.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        activeTrackColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 )
 
-                // Texto que muestra el tiempo actual y la duración total del podcast.
-//                Text(
-//                    text = "${formatTime(player.currentPosition)} / ${formatTime(player.duration)}", // Formatea y muestra el tiempo.
-//                    color = Color(0xFF555555), // Color del texto.
-//                    fontSize = 9.sp, // Tamaño de la fuente.
-//                    modifier = Modifier.width(60.dp) // Ancho fijo para el texto del tiempo.
-//                )
-
-                // Botón para mostrar/ocultar los controles de volumen.
+                // Botón de volumen.
                 IconButton(
-                    onClick = { showVolumeControls = !showVolumeControls }, // Cambia el estado de visibilidad.
-                    modifier = Modifier.size(40.dp) // Tamaño fijo para el botón.
+                    onClick = { showVolumeControls = !showVolumeControls },
+                    modifier = Modifier.size(40.dp)
                 ) {
-                    // Imagen del icono de volumen.
                     Image(
                         painter = painterResource(R.mipmap.volume),
                         contentDescription = "Volume Control",
-                        modifier = Modifier.size(28.dp) // Tamaño de la imagen dentro del botón.
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
@@ -111,32 +100,32 @@ fun AudioPlayer(
             // Controles de volumen (Slider) - se muestran condicionalmente.
             if (showVolumeControls) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically, // Alinea verticalmente al centro.
-                    horizontalArrangement = Arrangement.spacedBy(12.dp), // Espacio horizontal entre elementos.
-                    modifier = Modifier.padding(top = 8.dp) // Padding superior cuando se muestran.
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(top = 8.dp)
                 ) {
                     // Icono de volumen bajo.
                     Image(
                         painter = painterResource(R.mipmap.volume_down),
                         contentDescription = "Low volume",
-                        modifier = Modifier.size(28.dp) // Tamaño del icono.
+                        modifier = Modifier.size(28.dp)
                     )
 
-                    // Slider para controlar el volumen.
+                    // Slider de volumen.
                     Slider(
-                        value = currentVolume, // Valor actual del volumen.
+                        value = currentVolume,
                         onValueChange = { newVolume ->
-                            currentVolume = newVolume // Actualiza el estado del volumen en la UI.
-                            player.volume = newVolume // Actualiza el volumen en el ExoPlayer.
+                            currentVolume = newVolume
+                            player.volume = newVolume
                         },
-                        valueRange = 0f..1f, // Rango de volumen (de 0 a 1).
+                        valueRange = 0f..1f,
                         modifier = Modifier
-                            .weight(1f) // Ocupa el espacio disponible.
-                            .height(40.dp), // Altura aumentada para mejor interacción.
-                        colors = SliderDefaults.colors( // Colores personalizados.
-                            thumbColor = Color(0xFF555555),
-                            activeTrackColor = Color(0xFF555555),
-                            inactiveTrackColor = Color(0xFFFFFFFF)
+                            .weight(1f)
+                            .height(40.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            activeTrackColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
 
@@ -144,23 +133,10 @@ fun AudioPlayer(
                     Image(
                         painter = painterResource(R.mipmap.volume),
                         contentDescription = "High volume",
-                        modifier = Modifier.size(28.dp) // Tamaño del icono.
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
         }
     }
-}
-
-/**
- * Función de utilidad para formatear milisegundos a un string de tiempo (MM:SS).
- *
- * @param millis El tiempo en milisegundos.
- * @return String formateado como "MM:SS".
- */
-fun formatTime(millis: Long): String {
-    if (millis < 0) return "00:00" // Manejo de caso con duración negativa.
-    val seconds = (millis / 1000) % 60
-    val minutes = (millis / (1000 * 60)) % 60
-    return String.format("%02d:%02d", minutes, seconds)
 }
