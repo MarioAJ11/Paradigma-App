@@ -48,6 +48,7 @@ android {
 }
 
 dependencies {
+    // Dependencias base
     implementation(projects.shared)
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
@@ -56,6 +57,7 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     debugImplementation(libs.compose.ui.tooling)
 
+    //Dependencias nuevas
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.android)
     implementation(libs.ktor.client.content.negotiation)
