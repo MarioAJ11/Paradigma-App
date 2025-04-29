@@ -6,7 +6,7 @@
         android:allowBackup="false"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        android:icon="@mipmap/play"
+        android:icon="@mipmap/logo"
         android:label="Paradigma Media">
         <activity
             android:name=".MainActivity"
