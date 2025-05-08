@@ -16,17 +16,21 @@ import androidx.media3.exoplayer.ExoPlayer
  * Utiliza ExoPlayer para la reproducción.
  *
  * @param player Instancia de ExoPlayer que gestiona la reproducción.
+ * @param isPlaying Indica si el audio se está reproduciendo.
  * @param onPlayPauseClick Lambda que se ejecuta al hacer clic en el botón Play/Pause.
  * @param progress Progreso actual de la reproducción (valor entre 0.0 y 1.0).
  * @param onProgressChange Lambda que se ejecuta cuando el usuario cambia el progreso arrastrando el Slider.
+ * @param isLiveStream Indica si la fuente de audio es un streaming en vivo.
  * @param modifier Modificadores para aplicar a la composición.
  */
 @Composable
 fun AudioPlayer(
     player: ExoPlayer,
+    isPlaying: Boolean,
     onPlayPauseClick: () -> Unit,
     progress: Float,
     onProgressChange: (Float) -> Unit,
+    isLiveStream: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // Estado para controlar la visibilidad de los controles de volumen.
@@ -57,30 +61,34 @@ fun AudioPlayer(
                 ) {
                     Image(
                         painter = painterResource(
-                            id = if (player.isPlaying)
+                            id = if (isPlaying)
                                 R.mipmap.pause
                             else
                                 R.mipmap.play
                         ),
-                        contentDescription = if (player.isPlaying) "Pause" else "Play",
+                        contentDescription = if (isPlaying) "Pause" else "Play",
                         modifier = Modifier.size(32.dp)
                     )
                 }
 
-                // Slider de progreso.
-                Slider(
-                    value = progress,
-                    onValueChange = onProgressChange,
-                    valueRange = 0f..1f,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp),
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        activeTrackColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                // Slider de progreso (se muestra solo si no es un streaming en vivo).
+                if (!isLiveStream) {
+                    Slider(
+                        value = progress,
+                        onValueChange = onProgressChange,
+                        valueRange = 0f..1f,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            activeTrackColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     )
-                )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f)) // Opcional: Espacio para alinear el botón de volumen
+                }
 
                 // Botón de volumen.
                 IconButton(

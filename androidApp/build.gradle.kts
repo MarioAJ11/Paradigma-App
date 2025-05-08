@@ -63,4 +63,10 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.coil.compose)
+
+    // Dependencia de Corrutinas de Kotlin
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // Dependencia de Timber
+    implementation("com.jakewharton.timber:timber:5.0.1")
 }

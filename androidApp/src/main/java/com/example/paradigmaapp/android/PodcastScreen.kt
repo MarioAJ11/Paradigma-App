@@ -1,86 +1,126 @@
 package com.example.paradigmaapp.android
 
-import android.util.Log
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 /**
- * Composable principal [PodcastScreen] que representa la interfaz de usuario para la visualización
- * de la lista de podcasts y el control de reproducción de audio.
+ * [PodcastScreen] es el composable principal que orquesta la visualización de la lista de podcasts
+ * y el control de reproducción de audio, incluyendo tanto podcasts descargados como el streaming en vivo.
  *
- * Utiliza el [ArchiveService] para la obtención asíncrona de datos de podcasts desde la API
- * de archive.org y [ExoPlayer] para la gestión de audio.
- * Implementa una estrategia de carga inicial optimizada para una experiencia de usuario fluida.
+ * **Responsabilidades:**
+ * - Gestiona el estado de la lista de podcasts y la carga inicial desde [ArchiveService].
+ * - Controla la reproducción de podcasts individuales utilizando una instancia de [ExoPlayer].
+ * - Integra la reproducción del streaming en vivo a través de la clase [AndainaStream].
+ * - Presenta una interfaz de usuario que incluye una lista de podcasts y un reproductor de audio persistente.
+ * - Ofrece un botón de reproducción circular flotante para iniciar/detener la reproducción del streaming.
+ *
+ * **Estados Internos:**
+ * - `initialPodcasts`: Lista mutable que contiene los podcasts cargados inicialmente.
+ * - `isLoadingInitial`: Booleano que indica si la carga inicial de podcasts está en curso.
+ * - `currentPodcast`: El podcast actualmente seleccionado para su reproducción (puede ser nulo).
+ * - `podcastExoPlayer`: Instancia de [ExoPlayer] dedicada a la reproducción de podcasts.
+ * - `podcastProgress`: Flotante que representa el progreso de la reproducción del podcast (entre 0.0 y 1.0).
+ * - `podcastDuration`: Long que almacena la duración total del audio del podcast en milisegundos.
+ * - `isPodcastPlaying`: Booleano que indica si el podcast actual se está reproduciendo.
+ * - `seekJob`: Corrutina utilizada para controlar el "debounce" en la búsqueda del progreso del podcast.
+ * - `isAndainaStreamActive`: Booleano que indica si el streaming de Andaina se considera activo (basado en [checkAndainaStreamStatus]).
+ * - `isAndainaPlaying`: Booleano que indica si el streaming de Andaina se está reproduciendo actualmente.
+ *
+ * **Efectos Secundarios (`LaunchedEffect`, `DisposableEffect`):**
+ * - Carga inicial de la lista de podcasts al iniciar el composable.
+ * - Actualización continua del progreso y el estado de reproducción del podcast.
+ * - Carga y preparación del audio del podcast seleccionado.
+ * - Verificación inicial del estado del streaming y su reproducción automática si está activo.
+ * - Liberación de los recursos de [ExoPlayer] y [AndainaStream] al desmontar el composable.
+ *
+ * **Diseño de la UI:**
+ * - Utiliza un [Column] como contenedor principal para organizar los elementos verticalmente.
+ * - Muestra un indicador de carga mientras se obtienen los podcasts iniciales.
+ * - Presenta una lista de podcasts interactiva ([PodcastList]).
+ * - Un [Box] se utiliza para apilar el [CircularPlayButton] y el [AudioPlayer], permitiendo la colocación del botón encima y a la derecha del reproductor.
+ * - El [AudioPlayer] se muestra persistentemente en la parte inferior para controlar la reproducción tanto de podcasts como del streaming.
  */
 @Composable
 fun PodcastScreen() {
-    // Obtención del contexto local necesario para la inicialización de componentes dependientes del sistema.
     val context = LocalContext.current
-    // Instancia del servicio [ArchiveService] para la interacción con la API de podcasts.
     val archiveService = remember { ArchiveService() }
-    // Estado mutable para la lista inicial de podcasts.
+    val andainaStreamPlayer = remember(context) { AndainaStream(context) }
     var initialPodcasts by remember { mutableStateOf<List<Podcast>>(emptyList()) }
-    // Estado mutable para la visibilidad del indicador de carga inicial.
     var isLoadingInitial by remember { mutableStateOf(true) }
-    // Estado mutable para el podcast actualmente seleccionado.
     var currentPodcast by remember { mutableStateOf<Podcast?>(null) }
-    // Instancia de [ExoPlayer] para la reproducción de audio.
-    val exoPlayer = remember {
+    val coroutineScope = rememberCoroutineScope()
+    val podcastExoPlayer = remember {
         ExoPlayer.Builder(context)
             .build()
             .apply {
                 addListener(object : Player.Listener {
                     override fun onPlayerError(error: PlaybackException) {
-                        Log.e("AUDIO", "Error de reproducción: ${error.errorCodeName} - ${error.message}")
+                        Timber.e("Podcast ExoPlayer error: ${error.errorCodeName} - ${error.message}")
                     }
                 })
             }
     }
-    // Estado mutable para el progreso de la reproducción.
-    var progress by remember { mutableStateOf(0f) }
-    // Estado mutable para la duración total del audio.
-    var duration by remember { mutableStateOf(0L) }
-    // Estado mutable para indicar si el audio se está reproduciendo.
-    var isPlaying by remember { mutableStateOf(exoPlayer.isPlaying) }
-    // CoroutineScope asociado al ciclo de vida del Composable.
-    val coroutineScope = rememberCoroutineScope()
-    // Job para controlar la corrutina de búsqueda (debounce).
+    var podcastProgress by remember { mutableStateOf(0f) }
+    var podcastDuration by remember { mutableStateOf(0L) }
+    var isPodcastPlaying by remember { mutableStateOf(podcastExoPlayer.isPlaying) }
     var seekJob by remember { mutableStateOf<Job?>(null) }
+    var isAndainaStreamActive by remember { mutableStateOf(false) }
+    var isAndainaPlaying by remember { mutableStateOf(false) }
 
-    // Efecto para actualizar el progreso y estado de reproducción.
-    LaunchedEffect(exoPlayer.currentPosition, exoPlayer.isPlaying) {
+    suspend fun checkAndainaStreamStatus(): Boolean {
+        delay(1000) // Simulación de lógica de verificación. TODO: Implementar la lógica real de la API.
+        return true // Asumiendo que el stream siempre está activo para esta versión.
+    }
+
+    LaunchedEffect(Unit) {
+        isAndainaStreamActive = checkAndainaStreamStatus()
+        if (isAndainaStreamActive && !isAndainaPlaying) {
+            // Solo inicia la reproducción automática si el streaming está activo y no se está reproduciendo.
+            // Si ya se está reproduciendo, el usuario ya lo ha iniciado.
+            andainaStreamPlayer.play()
+            isAndainaPlaying = andainaStreamPlayer.isPlaying()
+        }
+    }
+
+    LaunchedEffect(podcastExoPlayer.currentPosition, podcastExoPlayer.isPlaying) {
         while (isActive) {
-            if (exoPlayer.duration > 0 && (exoPlayer.playbackState == Player.STATE_READY || exoPlayer.playbackState == Player.STATE_BUFFERING || exoPlayer.isPlaying)) {
-                progress = exoPlayer.currentPosition.toFloat() / exoPlayer.duration.toFloat()
-                duration = exoPlayer.duration
-            } else if (exoPlayer.playbackState == Player.STATE_ENDED) {
-                progress = 1f
-                isPlaying = false
+            if (podcastExoPlayer.duration > 0 && (podcastExoPlayer.playbackState == Player.STATE_READY || podcastExoPlayer.playbackState == Player.STATE_BUFFERING || podcastExoPlayer.isPlaying)) {
+                podcastProgress = podcastExoPlayer.currentPosition.toFloat() / podcastExoPlayer.duration.toFloat()
+                podcastDuration = podcastExoPlayer.duration
+            } else if (podcastExoPlayer.playbackState == Player.STATE_ENDED) {
+                podcastProgress = 1f
+                isPodcastPlaying = false
             }
-            isPlaying = exoPlayer.isPlaying
+            isPodcastPlaying = podcastExoPlayer.isPlaying
             delay(500)
         }
     }
 
-    // Efecto para cargar la lista inicial de podcasts y sus detalles.
     LaunchedEffect(Unit) {
         isLoadingInitial = true
         val fetchedInitialPodcasts = mutableListOf<Podcast>()
@@ -112,33 +152,33 @@ fun PodcastScreen() {
             }
 
         } catch (e: Exception) {
-            Log.e("PodcastScreen", "Error al obtener lista inicial", e)
+            Timber.e("Error fetching initial podcasts: $e")
             isLoadingInitial = false
         }
     }
 
-    // Efecto para cargar el audio del podcast seleccionado.
     LaunchedEffect(currentPodcast) {
         currentPodcast?.let { podcast ->
+            andainaStreamPlayer.stop() // Detiene el streaming al seleccionar un podcast.
             if (podcast.url.isNotEmpty()) {
-                exoPlayer.stop()
-                exoPlayer.clearMediaItems()
-                exoPlayer.setMediaItem(MediaItem.fromUri(podcast.url))
-                exoPlayer.prepare()
-                Log.d("AUDIO", "Preparando podcast: ${podcast.title} - URL: ${podcast.url}")
+                podcastExoPlayer.stop()
+                podcastExoPlayer.clearMediaItems()
+                podcastExoPlayer.setMediaItem(MediaItem.fromUri(podcast.url))
+                podcastExoPlayer.prepare()
+                podcastExoPlayer.playWhenReady = true
+                Timber.d("Preparando podcast: ${podcast.title} - URL: ${podcast.url}")
             }
         }
     }
 
-    // Efecto para liberar los recursos de ExoPlayer al destruir el Composable.
     DisposableEffect(Unit) {
         onDispose {
-            exoPlayer.release()
-            Log.d("AUDIO", "ExoPlayer liberado.")
+            podcastExoPlayer.release()
+            andainaStreamPlayer.release()
+            Timber.i("ExoPlayer and AndainaStream resources released on PodcastScreen dispose.")
         }
     }
 
-    // Interfaz de usuario principal.
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -177,34 +217,89 @@ fun PodcastScreen() {
                     podcasts = initialPodcasts,
                     onPodcastSelected = { podcast ->
                         currentPodcast = podcast
-                        exoPlayer.playWhenReady = true
                     }
                 )
             }
         }
 
-        AudioPlayer(
-            player = exoPlayer,
-            onPlayPauseClick = {
-                if (exoPlayer.isPlaying) {
-                    exoPlayer.pause()
-                } else {
-                    exoPlayer.play()
-                }
-            },
-            progress = progress,
-            onProgressChange = { newProgress ->
-                seekJob?.cancel()
-                seekJob = coroutineScope.launch {
-                    delay(300)
-                    if (duration > 0) {
-                        exoPlayer.seekTo((newProgress * duration).toLong())
+        // Contenedor para el botón de play y el reproductor de audio
+        Box(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Reproductor de audio principal que controla tanto podcasts como el streaming.
+            AudioPlayer(
+                player = if (currentPodcast != null) podcastExoPlayer else andainaStreamPlayer.exoPlayer!!,
+                isPlaying = if (currentPodcast != null) isPodcastPlaying else isAndainaPlaying,
+                onPlayPauseClick = {
+                    if (currentPodcast != null) {
+                        if (isPodcastPlaying) {
+                            podcastExoPlayer.pause()
+                            isPodcastPlaying = false
+                        } else {
+                            // Detener la reproducción del streaming si está activo
+                            if (isAndainaPlaying) {
+                                andainaStreamPlayer.pause()
+                                isAndainaPlaying = false
+                            }
+                            podcastExoPlayer.play()
+                            isPodcastPlaying = true
+                        }
+                    } else {
+                        if (isAndainaPlaying) {
+                            andainaStreamPlayer.pause()
+                            isAndainaPlaying = false
+                        } else {
+                            // Detener la reproducción del podcast si está activo (aunque currentPodcast sea null, por si acaso)
+                            if (isPodcastPlaying) {
+                                podcastExoPlayer.pause()
+                                isPodcastPlaying = false
+                            }
+                            andainaStreamPlayer.play()
+                            isAndainaPlaying = true
+                        }
                     }
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-        )
+                },
+                progress = if (currentPodcast != null) podcastProgress else 0f,
+                onProgressChange = { newProgress ->
+                    if (currentPodcast != null && podcastDuration > 0) {
+                        seekJob?.cancel()
+                        seekJob = coroutineScope.launch {
+                            delay(300)
+                            podcastExoPlayer.seekTo((newProgress * podcastDuration).toLong())
+                        }
+                    }
+                },
+                isLiveStream = false, // Indica al reproductor que siempre se trata como un podcast
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 56.dp)
+            )
+
+            // Botón circular de Play/Pause para el streaming, posicionado absolutamente.
+            if (isAndainaStreamActive) {
+                CircularPlayButton(
+                    onClick = {
+                        if (isAndainaPlaying) {
+                            andainaStreamPlayer.pause()
+                            isAndainaPlaying = false
+                        } else {
+                            // Detener la reproducción del podcast si está activo
+                            if (isPodcastPlaying) {
+                                podcastExoPlayer.pause()
+                                isPodcastPlaying = false
+                            }
+                            andainaStreamPlayer.play()
+                            isAndainaPlaying = true
+                        }
+                    },
+                    modifier = Modifier
+                        .size(60.dp)
+                        .absoluteOffset(
+                            x = LocalConfiguration.current.screenWidthDp.dp - 100.dp,
+                            y = -8.dp
+                        )
+                )
+            }
+        }
     }
 }
