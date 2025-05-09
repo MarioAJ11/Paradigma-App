@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
             // Esto asegura que los colores, tipografía, etc., definidos en MyApplicationTheme sean utilizados.
             MyApplicationTheme {
                 // Llama al Composable principal que define la estructura de la pantalla de Podcasts.
-                PodcastScreen()
+                AppScreen()
             }
         }
     }

@@ -1,4 +1,4 @@
-package com.example.paradigmaapp.android
+package com.example.paradigmaapp.android.podcast
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn

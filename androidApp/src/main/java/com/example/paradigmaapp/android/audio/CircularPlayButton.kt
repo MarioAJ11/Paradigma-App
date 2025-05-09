@@ -1,4 +1,4 @@
-package com.example.paradigmaapp.android
+package com.example.paradigmaapp.android.audio
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.example.paradigmaapp.android.R
 
 @Composable
 fun CircularPlayButton(onClick: () -> Unit, modifier: Modifier = Modifier) {

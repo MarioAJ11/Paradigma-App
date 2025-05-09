@@ -1,4 +1,4 @@
-package com.example.paradigmaapp.android
+package com.example.paradigmaapp.android.podcast
 
 import android.util.Log
 import androidx.compose.foundation.clickable

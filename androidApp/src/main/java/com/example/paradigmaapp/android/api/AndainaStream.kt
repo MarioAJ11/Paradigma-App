@@ -1,4 +1,4 @@
-package com.example.paradigmaapp.android
+package com.example.paradigmaapp.android.api
 
 import android.content.Context
 import androidx.media3.common.MediaItem
@@ -8,13 +8,13 @@ import timber.log.Timber
 /**
  * [AndainaStream] es una clase utilitaria robusta y bien encapsulada diseñada para
  * gestionar la reproducción del stream de audio de "Radio Andaina".
- * Utiliza la potente biblioteca [ExoPlayer] de Android Media3, proporcionando
+ * Utiliza la potente biblioteca [androidx.media3.exoplayer.ExoPlayer] de Android Media3, proporcionando
  * una abstracción clara para las operaciones de reproducción comunes.
  *
  * **Responsabilidades:**
- * - Inicialización y configuración del [ExoPlayer] específico para el stream de Andaina.
+ * - Inicialización y configuración del [androidx.media3.exoplayer.ExoPlayer] específico para el stream de Andaina.
  * - Control de la reproducción: iniciar (`play`), pausar (`pause`), detener (`stop`).
- * - Liberación de los recursos del [ExoPlayer] (`release`) para evitar fugas de memoria.
+ * - Liberación de los recursos del [androidx.media3.exoplayer.ExoPlayer] (`release`) para evitar fugas de memoria.
  * - Consulta del estado de reproducción actual (`isPlaying`).
  *
  * **Consideraciones de Diseño:**
@@ -27,13 +27,13 @@ import timber.log.Timber
  * en la gestión de la reproducción de un único stream.
  *
  * **Patrones Utilizados:**
- * - **Encapsulamiento:** Oculta la complejidad de la gestión de [ExoPlayer] y expone
+ * - **Encapsulamiento:** Oculta la complejidad de la gestión de [androidx.media3.exoplayer.ExoPlayer] y expone
  * solo las operaciones necesarias a través de métodos públicos.
- * - **Inicialización Lazy (implícita):** El [ExoPlayer] se crea en el bloque `init` cuando
+ * - **Inicialización Lazy (implícita):** El [androidx.media3.exoplayer.ExoPlayer] se crea en el bloque `init` cuando
  * se instancia la clase.
  *
- * @property context El [Context] de la aplicación necesario para construir la instancia
- * de [ExoPlayer]. Debe ser un contexto con un ciclo de vida adecuado
+ * @property context El [android.content.Context] de la aplicación necesario para construir la instancia
+ * de [androidx.media3.exoplayer.ExoPlayer]. Debe ser un contexto con un ciclo de vida adecuado
  * (por ejemplo, el de una `Service` o una `ComponentActivity`).
  */
 class AndainaStream(private val context: Context) {
@@ -63,7 +63,7 @@ class AndainaStream(private val context: Context) {
      */
     init {
         _exoPlayer = ExoPlayer.Builder(context).build().also {
-            Timber.d("AndainaStream: ExoPlayer instance created.")
+            Timber.Forest.d("AndainaStream: ExoPlayer instance created.")
         }
     }
 
@@ -78,8 +78,8 @@ class AndainaStream(private val context: Context) {
             player.setMediaItem(mediaItem)
             player.prepare()
             player.play()
-            Timber.i("AndainaStream: Started playing stream from $streamUrl.")
-        } ?: Timber.w("AndainaStream: play() called but ExoPlayer is null.")
+            Timber.Forest.i("AndainaStream: Started playing stream from $streamUrl.")
+        } ?: Timber.Forest.w("AndainaStream: play() called but ExoPlayer is null.")
     }
 
     /**
@@ -88,7 +88,7 @@ class AndainaStream(private val context: Context) {
      */
     fun pause() {
         _exoPlayer?.pause()
-        Timber.i("AndainaStream: Paused stream playback.")
+        Timber.Forest.i("AndainaStream: Paused stream playback.")
     }
 
     /**
@@ -98,7 +98,7 @@ class AndainaStream(private val context: Context) {
     fun stop() {
         _exoPlayer?.stop()
         _exoPlayer?.clearMediaItems()
-        Timber.i("AndainaStream: Stopped stream playback and cleared media items.")
+        Timber.Forest.i("AndainaStream: Stopped stream playback and cleared media items.")
     }
 
     /**
@@ -110,7 +110,7 @@ class AndainaStream(private val context: Context) {
     fun release() {
         _exoPlayer?.release()
         _exoPlayer = null
-        Timber.i("AndainaStream: ExoPlayer resources released.")
+        Timber.Forest.i("AndainaStream: ExoPlayer resources released.")
     }
 
     /**

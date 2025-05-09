@@ -1,4 +1,4 @@
-package com.example.paradigmaapp.android
+package com.example.paradigmaapp.android.podcast
 
 /**
  * Clase de datos que representa un Podcast con todos los metadatos.

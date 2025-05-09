@@ -1,18 +1,13 @@
 package com.example.paradigmaapp.android
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -20,6 +15,12 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import com.example.paradigmaapp.android.api.AndainaStream
+import com.example.paradigmaapp.android.api.ArchiveService
+import com.example.paradigmaapp.android.audio.AudioPlayer
+import com.example.paradigmaapp.android.audio.CircularPlayButton
+import com.example.paradigmaapp.android.podcast.Podcast
+import com.example.paradigmaapp.android.podcast.PodcastList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -33,9 +34,9 @@ import timber.log.Timber
  * y el control de reproducción de audio, incluyendo tanto podcasts descargados como el streaming en vivo.
  *
  * **Responsabilidades:**
- * - Gestiona el estado de la lista de podcasts y la carga inicial desde [ArchiveService].
+ * - Gestiona el estado de la lista de podcasts y la carga inicial desde [com.example.paradigmaapp.android.api.ArchiveService].
  * - Controla la reproducción de podcasts individuales utilizando una instancia de [ExoPlayer].
- * - Integra la reproducción del streaming en vivo a través de la clase [AndainaStream].
+ * - Integra la reproducción del streaming en vivo a través de la clase [com.example.paradigmaapp.android.api.AndainaStream].
  * - Presenta una interfaz de usuario que incluye una lista de podcasts y un reproductor de audio persistente.
  * - Ofrece un botón de reproducción circular flotante para iniciar/detener la reproducción del streaming.
  *
@@ -56,17 +57,17 @@ import timber.log.Timber
  * - Actualización continua del progreso y el estado de reproducción del podcast.
  * - Carga y preparación del audio del podcast seleccionado.
  * - Verificación inicial del estado del streaming y su reproducción automática si está activo.
- * - Liberación de los recursos de [ExoPlayer] y [AndainaStream] al desmontar el composable.
+ * - Liberación de los recursos de [ExoPlayer] y [com.example.paradigmaapp.android.api.AndainaStream] al desmontar el composable.
  *
  * **Diseño de la UI:**
  * - Utiliza un [Column] como contenedor principal para organizar los elementos verticalmente.
  * - Muestra un indicador de carga mientras se obtienen los podcasts iniciales.
- * - Presenta una lista de podcasts interactiva ([PodcastList]).
- * - Un [Box] se utiliza para apilar el [CircularPlayButton] y el [AudioPlayer], permitiendo la colocación del botón encima y a la derecha del reproductor.
- * - El [AudioPlayer] se muestra persistentemente en la parte inferior para controlar la reproducción tanto de podcasts como del streaming.
+ * - Presenta una lista de podcasts interactiva ([com.example.paradigmaapp.android.podcast.PodcastList]).
+ * - Un [Box] se utiliza para apilar el [com.example.paradigmaapp.android.audio.CircularPlayButton] y el [com.example.paradigmaapp.android.audio.AudioPlayer], permitiendo la colocación del botón encima y a la derecha del reproductor.
+ * - El [com.example.paradigmaapp.android.audio.AudioPlayer] se muestra persistentemente en la parte inferior para controlar la reproducción tanto de podcasts como del streaming.
  */
 @Composable
-fun PodcastScreen() {
+fun AppScreen() {
     val context = LocalContext.current
     val archiveService = remember { ArchiveService() }
     val andainaStreamPlayer = remember(context) { AndainaStream(context) }

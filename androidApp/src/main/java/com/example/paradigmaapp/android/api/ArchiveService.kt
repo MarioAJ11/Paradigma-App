@@ -1,9 +1,10 @@
-package com.example.paradigmaapp.android
+package com.example.paradigmaapp.android.api
 
 import android.util.Log
+import com.example.paradigmaapp.android.podcast.Podcast
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.android.Android
 import io.ktor.client.call.body
+import io.ktor.client.engine.android.Android
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.Dispatchers
@@ -14,21 +15,23 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import java.net.URLEncoder
 
 /**
  * [ArchiveService] es responsable de la comunicación con la API de archive.org
  * para obtener la información de los podcasts.
  *
- * Utiliza [HttpClient] de Ktor para realizar las peticiones de red de forma asíncrona.
+ * Utiliza [io.ktor.client.HttpClient] de Ktor para realizar las peticiones de red de forma asíncrona.
  * Implementa una estrategia para obtener primero una lista básica de podcasts
  * y luego obtener los detalles de cada uno, utilizando una caché en memoria para optimizar.
  */
 class ArchiveService {
     // Instancia única del [HttpClient] configurado para Android.
     private val client = HttpClient(Android) {
-        expectSuccess = true // Asegura que las respuestas HTTP con códigos de error lancen una excepción.
+        expectSuccess =
+            true // Asegura que las respuestas HTTP con códigos de error lancen una excepción.
     }
 
     internal companion object {
@@ -68,9 +71,11 @@ class ArchiveService {
                 val detailRequests = withContext(Dispatchers.IO) {
                     podcastsFromPage.map { podcast ->
                         async {
-                            podcastCache[podcast.identifier] ?: fetchPodcastDetails(podcast.identifier)?.also {
-                                podcastCache[podcast.identifier] = it
-                            } ?: podcast // Si falla la obtención de detalles, usamos la información básica.
+                            podcastCache[podcast.identifier]
+                                ?: fetchPodcastDetails(podcast.identifier)?.also {
+                                    podcastCache[podcast.identifier] = it
+                                }
+                                ?: podcast // Si falla la obtención de detalles, usamos la información básica.
                         }
                     }
                 }
@@ -130,7 +135,7 @@ class ArchiveService {
      * @return Un [Pair] que contiene la lista de [Podcast] y el número total de resultados.
      */
     internal fun processSearchResponse(jsonResponse: String): Pair<List<Podcast>, Int> {
-        val json = Json.parseToJsonElement(jsonResponse).jsonObject
+        val json = Json.Default.parseToJsonElement(jsonResponse).jsonObject
         val response = json["response"]?.jsonObject ?: return Pair(emptyList(), 0)
         val totalResults = response["numFound"]?.toString()?.toIntOrNull() ?: 0
         val docs = response["docs"]?.jsonArray ?: return Pair(emptyList(), totalResults)
@@ -179,7 +184,7 @@ class ArchiveService {
      * @return Un objeto [Podcast] actualizado o null si no se puede procesar.
      */
     private fun processMetadataResponse(jsonResponse: String, identifier: String): Podcast? {
-        val json = Json.parseToJsonElement(jsonResponse).jsonObject
+        val json = Json.Default.parseToJsonElement(jsonResponse).jsonObject
         val metadata = json["metadata"]?.jsonObject ?: return null
         val filesElement = json["files"]
         val files = if (filesElement is JsonElement) {
@@ -229,7 +234,7 @@ class ArchiveService {
      * Busca en la lista de archivos del metadato la URL del primer archivo de audio encontrado
      * con extensiones comunes como .mp3, .ogg o .m4a.
      *
-     * @param files El [JsonArray] que contiene la información de los archivos.
+     * @param files El [kotlinx.serialization.json.JsonArray] que contiene la información de los archivos.
      * @param identifier El identificador del item para construir la URL de descarga.
      * @return La URL del archivo de audio o null si no se encuentra ninguno.
      */
@@ -288,6 +293,6 @@ class ArchiveService {
      * @return La cadena codificada para ser utilizada en una URL.
      */
     private fun String.encodeUrl(): String {
-        return java.net.URLEncoder.encode(this, "UTF-8")
+        return URLEncoder.encode(this, "UTF-8")
     }
 }
