@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.example.paradigmaapp.android.R
 
 @Composable
-fun CircularPlayButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun PlayStreaming(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Image(
         painter = painterResource(id = R.mipmap.play),
         contentDescription = "Play",

@@ -69,4 +69,15 @@ dependencies {
 
     // Dependencia de Timber
     implementation("com.jakewharton.timber:timber:5.0.1")
+
+    // Dependencia necesaria para MediaControlIntent
+    implementation("androidx.media:media:1.7.0") // Añadida esta línea
+
+    // Dependencias de Media3 Session y ExoPlayer
+    implementation("androidx.media3:media3-session:1.6.1")
+    implementation("androidx.media3:media3-exoplayer:1.6.1")
+    // Si usas otros módulos de media3 como UI o DASH, asegúrate de incluirlos también.
+
+    // Dependencias de MediaRouter
+    implementation("androidx.mediarouter:mediarouter:1.7.0")
 }
