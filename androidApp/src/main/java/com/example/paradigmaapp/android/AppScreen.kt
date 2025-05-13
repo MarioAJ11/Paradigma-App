@@ -34,6 +34,7 @@ import com.example.paradigmaapp.android.ui.SearchBar
 import com.example.paradigmaapp.android.ui.UserIcon
 // --- Importación para WindowInsets ---
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.getValue
@@ -55,10 +56,15 @@ fun AppScreen() {
     val context = LocalContext.current
     val archiveService = remember { ArchiveService() }
     val andainaStreamPlayer = remember(context) { AndainaStream(context) }
+
+    // Estado para la lista inicial de podcasts
     var initialPodcasts by remember { mutableStateOf<List<Podcast>>(emptyList()) }
+    // Estado para la lista de podcasts filtrada por el texto de búsqueda
+    var filteredPodcasts by remember { mutableStateOf<List<Podcast>>(emptyList()) }
     var isLoadingInitial by remember { mutableStateOf(true) }
     var currentPodcast by remember { mutableStateOf<Podcast?>(null) }
     val coroutineScope = rememberCoroutineScope()
+
     val podcastExoPlayer = remember {
         ExoPlayer.Builder(context)
             .build()
@@ -70,12 +76,15 @@ fun AppScreen() {
                 })
             }
     }
+
     var podcastProgress by remember { mutableStateOf(0f) }
     var podcastDuration by remember { mutableStateOf(0L) }
     var isPodcastPlaying by remember { mutableStateOf(podcastExoPlayer.isPlaying) }
     var seekJob by remember { mutableStateOf<Job?>(null) }
     var isAndainaStreamActive by remember { mutableStateOf(false) }
     var isAndainaPlaying by remember { mutableStateOf(false) }
+
+    // Estado para el texto de búsqueda
     var searchText by remember { mutableStateOf("") }
 
 
@@ -84,6 +93,7 @@ fun AppScreen() {
         return true // Asumiendo que el stream siempre está activo para esta versión.
     }
 
+    // Effect para verificar el estado del stream de Andaina al inicio
     LaunchedEffect(Unit) {
         isAndainaStreamActive = checkAndainaStreamStatus()
         // Lógica inicial para reproducir el stream si está activo y no hay podcast seleccionado
@@ -94,9 +104,11 @@ fun AppScreen() {
         }
     }
 
+    // Effect para actualizar el progreso y estado de reproducción
     LaunchedEffect(podcastExoPlayer.currentPosition, podcastExoPlayer.isPlaying, andainaStreamPlayer.exoPlayer?.currentPosition, andainaStreamPlayer.isPlaying()) {
         while (isActive) {
             if (currentPodcast != null) {
+                // Gestionar estado y progreso del podcast
                 if (podcastExoPlayer.duration > 0 && (podcastExoPlayer.playbackState == Player.STATE_READY || podcastExoPlayer.playbackState == Player.STATE_BUFFERING || podcastExoPlayer.isPlaying)) {
                     podcastProgress = podcastExoPlayer.currentPosition.toFloat() / podcastExoPlayer.duration.toFloat()
                     podcastDuration = podcastExoPlayer.duration
@@ -107,7 +119,7 @@ fun AppScreen() {
                 isPodcastPlaying = podcastExoPlayer.isPlaying
                 isAndainaPlaying = false // Si hay podcast, el stream no está reproduciendo
             } else {
-                // Si no hay podcast, gestiona el estado del stream
+                // Si no hay podcast, gestionar el estado del stream
                 isAndainaPlaying = andainaStreamPlayer.isPlaying()
                 isPodcastPlaying = false // Si hay stream, el podcast no está reproduciendo
                 // TODO: Si necesitas mostrar progreso para el stream, deberías obtenerlo de andainaStreamPlayer.exoPlayer!!
@@ -117,7 +129,7 @@ fun AppScreen() {
         }
     }
 
-
+    // Effect para cargar la lista inicial de podcasts
     LaunchedEffect(Unit) {
         isLoadingInitial = true
         try {
@@ -127,7 +139,7 @@ fun AppScreen() {
                     initialPodcasts = allPodcasts
                     isLoadingInitial = false
                 }
-            }.join()
+            }.join() // Espera a que la corrutina de carga termine
 
         } catch (e: Exception) {
             Timber.e("Error fetching initial podcasts: $e")
@@ -136,6 +148,22 @@ fun AppScreen() {
         }
     }
 
+    // *** NUEVO LaunchedEffect para filtrar los podcasts cuando cambia searchText o initialPodcasts ***
+    LaunchedEffect(searchText, initialPodcasts) {
+        Timber.d("Filtering podcasts with searchText: '$searchText'")
+        filteredPodcasts = if (searchText.isBlank()) {
+            // Si el texto de búsqueda está vacío, mostrar la lista completa
+            initialPodcasts
+        } else {
+            // Filtrar la lista inicial de podcasts basándose en el texto de búsqueda (ignorar mayúsculas/minúsculas)
+            initialPodcasts.filter { podcast ->
+                podcast.title.contains(searchText, ignoreCase = true)
+            }
+        }
+        Timber.d("Filtered list size: ${filteredPodcasts.size}")
+    }
+
+    // Effect para manejar la selección de un podcast
     LaunchedEffect(currentPodcast) {
         currentPodcast?.let { podcast ->
             // Si seleccionas un podcast y el stream está activo, detenlo.
@@ -163,6 +191,7 @@ fun AppScreen() {
         }
     }
 
+    // Effect para liberar recursos del player cuando el Composable se destruye
     DisposableEffect(Unit) {
         onDispose {
             podcastExoPlayer.release()
@@ -170,6 +199,7 @@ fun AppScreen() {
             Timber.i("ExoPlayer and AndainaStream resources released on AppScreen dispose.")
         }
     }
+
 
     Column(
         modifier = Modifier
@@ -180,7 +210,7 @@ fun AppScreen() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // *** Asegúrate de que este modificador esté presente ***
+                // Asegúrate de que este modificador esté presente para el padding de la barra de estado
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -188,8 +218,10 @@ fun AppScreen() {
         ) {
             SearchBar(
                 searchText = searchText,
-                onSearchTextChanged = { searchText = it },
-                modifier = Modifier.weight(1f).padding(end = 8.dp)
+                onSearchTextChanged = { newText -> searchText = newText }, // Actualiza el estado searchText
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp)
             )
 
             UserIcon(
@@ -209,7 +241,8 @@ fun AppScreen() {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
-            initialPodcasts.isEmpty() -> {
+            initialPodcasts.isEmpty() && searchText.isBlank() -> {
+                // Mostrar mensaje solo si no hay podcasts Y no se está buscando nada
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -225,14 +258,34 @@ fun AppScreen() {
                     )
                 }
             }
+            filteredPodcasts.isEmpty() && searchText.isNotBlank() -> {
+                // Mostrar mensaje si la lista filtrada está vacía Y se está buscando algo
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No se encontraron podcasts que coincidan con \"$searchText\".",
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 18.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
             else -> {
-                // TODO: Filtrar initialPodcasts basándose en searchText
+                // Mostrar la lista de podcasts filtrada
                 PodcastList(
-                    podcasts = initialPodcasts, // O filteredPodcasts
+                    podcasts = filteredPodcasts, // *** Usa la lista filtrada aquí ***
                     onPodcastSelected = { podcast ->
                         currentPodcast = podcast
                     },
-                    modifier = Modifier.weight(1f) // Asegúrate de que PodcastList acepta Modifier
+                    modifier = Modifier
+                        .weight(1f)
+                        // <-- Assuming PodcastList items visually have 16.dp horizontal padding
+                        .padding(horizontal = 16.dp) // Add horizontal padding here
                 )
             }
         }
@@ -247,49 +300,54 @@ fun AppScreen() {
         ) {
             // El AudioPlayer se muestra y sus controles gestionan la reproducción
             // del podcast o del stream según cuál esté activo.
-            AudioPlayer(
-                player = if (currentPodcast != null) podcastExoPlayer else andainaStreamPlayer.exoPlayer!!,
-                isPlaying = if (currentPodcast != null) isPodcastPlaying else isAndainaPlaying,
-                onPlayPauseClick = {
-                    if (currentPodcast != null) {
-                        // Lógica para pausar/reproducir podcast
-                        if (isPodcastPlaying) {
-                            podcastExoPlayer.pause()
+            // Asegúrate de que player no sea null antes de pasarlo
+            val activePlayer = if (currentPodcast != null) podcastExoPlayer else andainaStreamPlayer.exoPlayer
+            if (activePlayer != null) {
+                AudioPlayer(
+                    player = activePlayer,
+                    isPlaying = if (currentPodcast != null) isPodcastPlaying else isAndainaPlaying,
+                    onPlayPauseClick = {
+                        if (currentPodcast != null) {
+                            // Lógica para pausar/reproducir podcast
+                            if (isPodcastPlaying) {
+                                podcastExoPlayer.pause()
+                            } else {
+                                // Si pausas el stream desde el AudioPlayer y quieres reproducir el podcast
+                                // desde ahí, podrías añadir lógica para pausar el stream aquí
+                                // if (isAndainaPlaying) andainaStreamPlayer.pause()
+                                podcastExoPlayer.play()
+                            }
                         } else {
-                            // Si pausas el stream desde el AudioPlayer y quieres reproducir el podcast
-                            // desde ahí, podrías añadir lógica para pausar el stream aquí
-                            // if (isAndainaPlaying) andainaStreamPlayer.pause()
-                            podcastExoPlayer.play()
+                            // Lógica para pausar/reproducir stream
+                            if (isAndainaPlaying) {
+                                andainaStreamPlayer.pause()
+                            } else {
+                                // Si pausas el podcast desde el AudioPlayer y quieres reproducir el stream
+                                // desde ahí, podrías añadir lógica para pausar el podcast aquí
+                                // if (isPodcastPlaying) podcastExoPlayer.pause()
+                                andainaStreamPlayer.play()
+                            }
                         }
-                    } else {
-                        // Lógica para pausar/reproducir stream
-                        if (isAndainaPlaying) {
-                            andainaStreamPlayer.pause()
-                        } else {
-                            // Si pausas el podcast desde el AudioPlayer y quieres reproducir el stream
-                            // desde ahí, podrías añadir lógica para pausar el podcast aquí
-                            // if (isPodcastPlaying) podcastExoPlayer.pause()
-                            andainaStreamPlayer.play()
+                    },
+                    progress = if (currentPodcast != null) podcastProgress else 0f, // TODO: Considerar progreso del stream si es posible
+                    onProgressChange = { newProgress ->
+                        if (currentPodcast != null && podcastDuration > 0) {
+                            seekJob?.cancel()
+                            seekJob = coroutineScope.launch {
+                                delay(100)
+                                podcastExoPlayer.seekTo((newProgress * podcastDuration).toLong())
+                            }
                         }
-                    }
-                },
-                progress = if (currentPodcast != null) podcastProgress else 0f, // TODO: Considerar progreso del stream si es posible
-                onProgressChange = { newProgress ->
-                    if (currentPodcast != null && podcastDuration > 0) {
-                        seekJob?.cancel()
-                        seekJob = coroutineScope.launch {
-                            delay(100)
-                            podcastExoPlayer.seekTo((newProgress * podcastDuration).toLong())
-                        }
-                    }
-                },
-                isLiveStream = currentPodcast == null && isAndainaStreamActive, // Pasa si es stream en vivo (cuando no hay podcast)
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 8.dp)
-            )
+                    },
+                    isLiveStream = currentPodcast == null && isAndainaStreamActive, // Pasa si es stream en vivo (cuando no hay podcast)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 8.dp)
+                )
+            }
 
-            // *** Modificamos la condición aquí: Ahora solo depende de isAndainaStreamActive ***
+
             if (isAndainaStreamActive) {
                 PlayStreaming(
                     onClick = {
@@ -297,6 +355,7 @@ fun AppScreen() {
                         if (isAndainaPlaying) {
                             andainaStreamPlayer.pause()
                             // isAndainaPlaying se actualizará vía LaunchedEffect
+
                         } else {
                             // Si inicias el stream desde este botón, detén el podcast si está activo
                             if (currentPodcast != null && isPodcastPlaying) {
@@ -312,12 +371,11 @@ fun AppScreen() {
                     modifier = Modifier
                         .size(54.dp)
                         .absoluteOffset(
-                            x = LocalConfiguration.current.screenWidthDp.dp - 55.dp,
-                            y = -58.dp // Ajusta la posición si es necesario
+                            x = LocalConfiguration.current.screenWidthDp.dp - 55.dp - 16.dp,
+                            y = -58.dp - 8.dp
                         )
                 )
             }
-            // *** Fin de la modificación de la condición ***
         }
     }
 }

@@ -80,4 +80,7 @@ dependencies {
 
     // Dependencias de MediaRouter
     implementation("androidx.mediarouter:mediarouter:1.7.0")
+
+
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.0.0")
 }

@@ -28,9 +28,9 @@ fun UserIcon(
     Box(
         modifier = modifier
             .size(48.dp) // Tamaño del círculo
-            .background(MaterialTheme.colorScheme.primary, CircleShape) // Color del tema
+            .background(MaterialTheme.colorScheme.primary, CircleShape)
             .padding(4.dp) // Espacio interno
-        // Puedes añadir .clickable { onClick?.invoke() } si quieres que sea clickeable
+        // TODO:Añadir .clickable { onClick?.invoke() }
         ,
         contentAlignment = Alignment.Center
     ) {

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.foundation.shape.RoundedCornerShape // Import for RoundedCornerShape
 
 /**
  * Composable para un campo de búsqueda con icono.
@@ -26,8 +27,8 @@ fun SearchBar(
     modifier: Modifier = Modifier
 ) {
     OutlinedTextField(
-        value = searchText,
-        onValueChange = onSearchTextChanged,
+        value = searchText, // Muestra el texto que le pasas
+        onValueChange = onSearchTextChanged, // Llama a este callback cada vez que el usuario escribe
         label = { Text("Buscar...") },
         leadingIcon = {
             Icon(
@@ -35,16 +36,18 @@ fun SearchBar(
                 contentDescription = "Icono de búsqueda"
             )
         },
+        shape = RoundedCornerShape(28.dp),
         modifier = modifier
             .fillMaxWidth() // Esto probablemente se sobrescribirá al usarlo en una Row,
-            // pero es un buen valor predeterminado si se usa solo.
-            .height(56.dp) // Altura fija
+                            // pero es un buen valor predeterminado si se usa solo.
+            .height(56.dp)
     )
 }
 
 @Preview(showBackground = true)
 @Composable
 fun PreviewSearchBar() {
+    // En el preview, necesitamos un estado mutable para simular la escritura.
     var searchText by remember { mutableStateOf("") }
     SearchBar(searchText = searchText, onSearchTextChanged = { searchText = it })
 }
