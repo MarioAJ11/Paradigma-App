@@ -20,7 +20,7 @@ fun PlayStreaming(onClick: () -> Unit, modifier: Modifier = Modifier) {
         painter = painterResource(id = R.mipmap.play),
         contentDescription = "Play",
         modifier = modifier
-            .size(60.dp)
+            .size(64.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.primary)
             .clickable { onClick() }

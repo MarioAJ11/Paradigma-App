@@ -55,6 +55,8 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.navigation.runtime.android)
+    implementation(libs.androidx.navigation.compose.jvmstubs)
     debugImplementation(libs.compose.ui.tooling)
 
     //Dependencias nuevas
@@ -64,23 +66,33 @@ dependencies {
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.coil.compose)
 
-    // Dependencia de Corrutinas de Kotlin
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // Dependencia de Timber
     implementation("com.jakewharton.timber:timber:5.0.1")
 
-    // Dependencia necesaria para MediaControlIntent
-    implementation("androidx.media:media:1.7.0") // Añadida esta línea
+    implementation("androidx.media:media:1.7.0")
 
-    // Dependencias de Media3 Session y ExoPlayer
     implementation("androidx.media3:media3-session:1.6.1")
     implementation("androidx.media3:media3-exoplayer:1.6.1")
-    // Si usas otros módulos de media3 como UI o DASH, asegúrate de incluirlos también.
 
-    // Dependencias de MediaRouter
     implementation("androidx.mediarouter:mediarouter:1.7.0")
 
-
     implementation("org.jetbrains.kotlin:kotlin-stdlib:2.0.0")
+
+    implementation("androidx.compose.material:material-icons-extended:1.6.7")
+
+    implementation(projects.shared)
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.material3)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.common)
+    debugImplementation(libs.compose.ui.tooling)
+
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.android)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.coil.compose)
 }
