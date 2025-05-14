@@ -6,17 +6,11 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.android.Android
 import io.ktor.client.request.get
-import io.ktor.client.request.head // Import HEAD request
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.HttpStatusCode // Import HttpStatusCode
-import io.ktor.http.contentLength
-import io.ktor.http.contentType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -37,9 +31,7 @@ class ArchiveService { // Mantén la instancia del cliente aquí
 
     // Instancia única del [HttpClient] configurado para Android.
     private val client = HttpClient(Android) {
-        expectSuccess = true // Asegura que las respuestas HTTP con códigos de error lancen una excepción.
-        // No necesitas configurar expectSuccess para la petición HEAD si vas a
-        // manejar los códigos de estado manualmente.
+        expectSuccess = true
         // install(HttpTimeout) { // Opcional: Añadir timeouts para peticiones HEAD
         //     requestTimeoutMillis = 5000 // 5 segundos
         //     connectTimeoutMillis = 5000
@@ -58,9 +50,6 @@ class ArchiveService { // Mantén la instancia del cliente aquí
         // La clave del mapa es el identificador único del podcast.
         // Modificado para almacenar información parcial inicialmente y actualizar con detalles.
         val podcastCache = mutableMapOf<String, Podcast>()
-
-        // URL del stream de Andaina (ajústala si es diferente)
-        const val ANDAINA_STREAM_URL = "http://andaina.radios.cc:8000/andaina" // <-- Verifica esta URL
     }
 
     /**

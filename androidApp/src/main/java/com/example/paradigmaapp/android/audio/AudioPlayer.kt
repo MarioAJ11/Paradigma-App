@@ -1,162 +1,178 @@
 package com.example.paradigmaapp.android.audio
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.ExoPlayer
 import com.example.paradigmaapp.android.R
 
 /**
- * Composable que representa el reproductor de audio con controles básicos.
- * Utiliza ExoPlayer para la reproducción.
- *
- * @param player Instancia de ExoPlayer que gestiona la reproducción.
- * @param isPlaying Indica si el audio se está reproduciendo.
- * @param onPlayPauseClick Lambda que se ejecuta al hacer clic en el botón Play/Pause.
- * @param progress Progreso actual de la reproducción (valor entre 0.0 y 1.0).
- * @param onProgressChange Lambda que se ejecuta cuando el usuario cambia el progreso arrastrando el Slider.
- * @param isLiveStream Indica si la fuente de audio es un streaming en vivo.
- * @param modifier Modificadores para aplicar a la composición.
- * @param duration La duración total del medio en milisegundos.
+ * Composable que representa el reproductor de audio con controles estilo Spotify.
  */
 @Composable
 fun AudioPlayer(
-    player: ExoPlayer?, // Now explicitly handling this nullable type
+    player: ExoPlayer?,
     isPlaying: Boolean,
     onPlayPauseClick: () -> Unit,
     progress: Float,
     onProgressChange: (Float) -> Unit,
     isLiveStream: Boolean = false,
-    duration: Long = 0L,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    podcastTitle: String? = null,
+    podcastImage: Int? = null,
+    isAndainaPlaying: Boolean = false, // Nuevo estado para el stream
+    onPlayStreamingClick: () -> Unit = {}, // Nueva lambda para controlar el stream
+    onPodcastInfoClick: () -> Unit = {} // Nueva lambda para iniciar el podcast al clickar la info
 ) {
-    // Estado para controlar la visibilidad de los controles de volumen.
     var showVolumeControls by remember { mutableStateOf(false) }
-    // Estado para almacenar el volumen actual del reproductor.
-    // Initialize with default value if player is null
     var currentVolume by remember { mutableFloatStateOf(player?.volume ?: 0f) }
+    var showProgressCircle by remember { mutableStateOf(false) }
+    var progressCirclePosition by remember { mutableStateOf(0f) }
 
-    // Effect para actualizar el estado del volumen si cambia externamente
-    // Use safe call on player?.volume
     LaunchedEffect(player?.volume) {
-        currentVolume = player?.volume ?: 0f // Handle null case
+        currentVolume = player?.volume ?: 0f
     }
 
-    // Card que envuelve el reproductor, dándole un fondo y forma.
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(8.dp)
     ) {
-        // Columna principal que organiza los elementos del reproductor verticalmente.
         Column(
-            modifier = Modifier.padding(16.dp), // Increased padding slightly for better spacing
-            verticalArrangement = Arrangement.spacedBy(8.dp) // Increased spacing
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Fila de controles principales.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Botón Play/Pause.
-                IconButton(
-                    onClick = onPlayPauseClick,
-                    modifier = Modifier.size(48.dp)
+                // Información del podcast/streaming
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .clickable(enabled = podcastImage != null || !podcastTitle.isNullOrEmpty()) {
+                            onPodcastInfoClick()
+                        }
                 ) {
-                    Image(
-                        painter = painterResource(
-                            id = if (isPlaying)
-                                R.mipmap.pause
-                            else
-                                R.mipmap.play
-                        ),
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-
-                // Slider de progreso (se muestra solo si no es un streaming en vivo).
-                // Also ensure duration is positive before showing the slider
-                if (!isLiveStream) {
-                    Slider(
-                        value = progress,
-                        onValueChange = onProgressChange,
-                        valueRange = 0f..1f,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(40.dp),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            activeTrackColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    if (podcastImage != null) {
+                        Image(
+                            painter = painterResource(id = podcastImage),
+                            contentDescription = podcastTitle ?: "Imagen del podcast",
+                            modifier = Modifier.size(40.dp)
                         )
-                    )
-                    // You might want to add duration text here as well
-                } else {
-                    Spacer(modifier = Modifier.weight(1f)) // Espacio para alinear el botón de volumen
+                        Text(
+                            text = podcastTitle ?: "Sin streaming en directo",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    } else {
+                        Text(
+                            text = if (!podcastTitle.isNullOrEmpty()) "Streaming en vivo: $podcastTitle" else "Sin streaming en directo",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
 
-                // Botón de volumen.
-                IconButton(
-                    onClick = { showVolumeControls = !showVolumeControls },
-                    modifier = Modifier.size(40.dp)
+                // Controles
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Image(
-                        painter = painterResource(R.mipmap.volume),
-                        contentDescription = "Volume Control",
-                        modifier = Modifier.size(28.dp)
-                    )
+                    IconButton(onClick = onPlayPauseClick) {
+                        Icon(
+                            painter = painterResource(id = if (isPlaying) R.mipmap.pause else R.mipmap.play),
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                    IconButton(onClick = { showVolumeControls = !showVolumeControls }) {
+                        Icon(
+                            painter = painterResource(id = R.mipmap.volume),
+                            contentDescription = "Volume Control",
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                    // Botón de PlayStreaming
+                    IconButton(onClick = onPlayStreamingClick) {
+                        Icon(
+                            painter = painterResource(id = R.mipmap.streaming),
+                            contentDescription = if (isAndainaPlaying) "Stop Streaming" else "Play Streaming",
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
                 }
             }
 
-            // Controles de volumen (Slider) - se muestran condicionalmente.
-            // Only show volume controls if player is not null
+            // Controles de volumen
             if (showVolumeControls && player != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    // Icono de volumen bajo.
-                    Image(
-                        painter = painterResource(R.mipmap.volume_down),
-                        contentDescription = "Low volume",
-                        modifier = Modifier.size(28.dp)
-                    )
+                Slider(
+                    value = currentVolume,
+                    onValueChange = { newVolume ->
+                        currentVolume = newVolume
+                        player.volume = newVolume
+                    },
+                    valueRange = 0f..1f,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
-                    // Slider de volumen.
-                    Slider(
-                        value = currentVolume,
-                        onValueChange = { newVolume ->
-                            currentVolume = newVolume
-                            // Update player volume using safe call
-                            player.volume = newVolume
-                        },
-                        valueRange = 0f..1f,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(40.dp),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            activeTrackColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+            // Borde inferior para el progreso
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { offset ->
+                                showProgressCircle = true
+                                progressCirclePosition = offset.x / size.width
+                                onProgressChange(progressCirclePosition)
+                            },
+                            onHorizontalDrag = { change, dragAmount ->
+                                progressCirclePosition = (change.position.x / size.width).coerceIn(0f, 1f)
+                                onProgressChange(progressCirclePosition)
+                            },
+                            onDragEnd = {
+                                showProgressCircle = false
+                            }
                         )
+                    }
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val progressWidth = size.width * progress
+                    val progressColor = Color(0xFFD4CFCF)
+                    drawLine(
+                        color = progressColor,
+                        start = Offset(0f, center.y),
+                        end = Offset(progressWidth, center.y),
+                        strokeWidth = size.height
                     )
-
-                    // Icono de volumen alto.
-                    Image(
-                        painter = painterResource(R.mipmap.volume),
-                        contentDescription = "High volume",
-                        modifier = Modifier.size(28.dp)
-                    )
+                    if (showProgressCircle) {
+                        val circleX = size.width * progressCirclePosition
+                        drawCircle(
+                            color = progressColor,
+                            radius = 8.dp.toPx(),
+                            center = Offset(circleX, center.y)
+                        )
+                    }
                 }
             }
         }

@@ -5,7 +5,6 @@ import io.ktor.client.engine.android.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
-import timber.log.Timber // Si usas Timber para logging de Ktor
 
 val ktorClient = HttpClient(Android) {
     install(ContentNegotiation) {

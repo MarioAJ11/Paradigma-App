@@ -1,84 +1,51 @@
 package com.example.paradigmaapp.android.ui
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.platform.LocalUriHandler
 
 /**
- * Composable que representa la pantalla de ajustes de la aplicación.
- * Permite al usuario configurar diversas opciones.
- *
- * @param navController El NavHostController para manejar la navegación (ej. volver atrás).
+ * Composable que muestra un diálogo simple para ajustes, ahora con un enlace a la web y control de streaming.
  */
-@OptIn(ExperimentalMaterial3Api::class) // Necesario para TopAppBar en Material3
 @Composable
-fun SettingsScreen(navController: NavHostController) {
-    // Scaffold proporciona una estructura básica para la pantalla
-    Scaffold(
-        topBar = {
-            // TopAppBar para la barra superior con título y botón de retroceso
-            TopAppBar(
-                title = { Text("Ajustes") },
-                navigationIcon = {
-                    // Botón de retroceso que usa popBackStack para volver
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver atrás"
-                        )
+fun SettingsDialog(
+    onDismissRequest: () -> Unit,
+    isStreamActive: Boolean,
+    onStreamActiveChanged: (Boolean) -> Unit
+) {
+    val uriHandler = LocalUriHandler.current
+
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = {
+            Text(text = "Ajustes")
+        },
+        text = {
+            Column {
+                TextButton(
+                    onClick = {
+                        uriHandler.openUri("https://paradigmamedia.org/")
+                        // onDismissRequest() // Opcional: cerrar el diálogo después de abrir el enlace
                     }
+                ) {
+                    Text("Visitar web de Paradigma Media")
                 }
-            )
+                // Añade aquí otras opciones de ajustes si es necesario
+                // Ejemplo de un control para activar/desactivar el streaming
+                TextButton(
+                    onClick = { onStreamActiveChanged(!isStreamActive) }
+                ) {
+                    Text(if (isStreamActive) "Desactivar Streaming" else "Activar Streaming")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text("Cerrar")
+            }
         }
-    ) { paddingValues ->
-        // Contenido principal de la pantalla de ajustes
-        Column(
-            modifier = Modifier
-                .padding(paddingValues) // Aplica el padding proporcionado por Scaffold
-                .fillMaxSize() // Llena el espacio disponible
-                .padding(16.dp), // Padding interno para el contenido
-            horizontalAlignment = Alignment.CenterHorizontally, // Alinea el contenido horizontalmente
-            verticalArrangement = Arrangement.spacedBy(16.dp) // Espacio entre elementos
-        ) {
-            // Título de la sección de ajustes
-            Text(
-                "Configuración del Usuario",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-
-            Divider() // Separador visual
-
-            // TODO: Añadie los elementos de UI para tus ajustes
-            // Ejemplo provisional
-            Text(
-                "Opción de ajuste 1",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Switch(checked = false, onCheckedChange = {}) // Un ejemplo de un switch
-
-            Text(
-                "Opción de ajuste 2",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun PreviewSettingsScreen() {
-    // Para el Preview, necesitamos un NavHostController "dummy".
-    // rememberNavController() funciona en @Preview Composable.
-    SettingsScreen(navController = rememberNavController())
+    )
 }

@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.Color
  */
 private val DarkColorScheme = darkColorScheme(
     primary = Color(0xFFFFD700), // Amarillo oro
-    secondary = Color(0xFF03DAC6), // Cian (ejemplo, puedes ajustarlo)
+    secondary = Color(0xFF6C6868), // Gris medio
     background = Color.Black, // Fondo negro
     surface = Color.Black,
     onPrimary = Color.Black,
@@ -42,7 +42,7 @@ private val DarkColorScheme = darkColorScheme(
  */
 private val LightColorScheme = lightColorScheme(
     primary = Color(0xFFFFD700), // Amarillo oro
-    secondary = Color(0xFF03DAC6), // Cian (ejemplo, puedes ajustarlo)
+    secondary = Color(0xFF6C6868), // Gris medio
     background = Color.White, // Fondo blanco
     surface = Color.White,
     onPrimary = Color.Black,

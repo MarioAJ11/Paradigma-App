@@ -3,7 +3,6 @@ package com.example.paradigmaapp.android.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
@@ -11,7 +10,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.foundation.shape.RoundedCornerShape // Import for RoundedCornerShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
  * Composable para un campo de búsqueda con icono.
