@@ -20,7 +20,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.example.paradigmaapp.android.R
 
 /**
- * Composable que representa el reproductor de audio con controles estilo Spotify.
+ * Composable que representa el reproductor de audio.
  */
 @Composable
 fun AudioPlayer(
@@ -33,9 +33,10 @@ fun AudioPlayer(
     modifier: Modifier = Modifier,
     podcastTitle: String? = null,
     podcastImage: Int? = null,
-    isAndainaPlaying: Boolean = false, // Nuevo estado para el stream
-    onPlayStreamingClick: () -> Unit = {}, // Nueva lambda para controlar el stream
-    onPodcastInfoClick: () -> Unit = {} // Nueva lambda para iniciar el podcast al clickar la info
+    isAndainaPlaying: Boolean = false,
+    onPlayStreamingClick: () -> Unit = {},
+    onPodcastInfoClick: () -> Unit = {},
+    onVolumeIconClick: () -> Unit = {}
 ) {
     var showVolumeControls by remember { mutableStateOf(false) }
     var currentVolume by remember { mutableFloatStateOf(player?.volume ?: 0f) }
@@ -102,7 +103,7 @@ fun AudioPlayer(
                             modifier = Modifier.size(32.dp)
                         )
                     }
-                    IconButton(onClick = { showVolumeControls = !showVolumeControls }) {
+                    IconButton(onClick = { onVolumeIconClick() }) { // <---- USA LA LAMBDA RECIBIDA
                         Icon(
                             painter = painterResource(id = R.mipmap.volume),
                             contentDescription = "Volume Control",
@@ -118,19 +119,6 @@ fun AudioPlayer(
                         )
                     }
                 }
-            }
-
-            // Controles de volumen
-            if (showVolumeControls && player != null) {
-                Slider(
-                    value = currentVolume,
-                    onValueChange = { newVolume ->
-                        currentVolume = newVolume
-                        player.volume = newVolume
-                    },
-                    valueRange = 0f..1f,
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
 
             // Borde inferior para el progreso

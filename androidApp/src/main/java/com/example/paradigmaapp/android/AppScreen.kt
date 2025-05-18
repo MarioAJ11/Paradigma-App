@@ -1,7 +1,12 @@
 package com.example.paradigmaapp.android
 
+import android.Manifest
+import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -14,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -21,9 +27,12 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.example.paradigmaapp.android.api.AndainaStream
 import com.example.paradigmaapp.android.api.ArchiveService
 import com.example.paradigmaapp.android.audio.AudioPlayer
-import com.example.paradigmaapp.android.audio.PlayStreaming
+import com.example.paradigmaapp.android.audio.VolumeControl
 import com.example.paradigmaapp.android.podcast.Podcast
 import com.example.paradigmaapp.android.podcast.PodcastList
+import com.example.paradigmaapp.android.ui.SearchBar
+import com.example.paradigmaapp.android.ui.SettingsDialog
+import com.example.paradigmaapp.android.ui.UserIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,17 +40,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-
-// Componentes de UI personalizados
-import com.example.paradigmaapp.android.ui.SearchBar
-import com.example.paradigmaapp.android.ui.UserIcon
-// Manejo de insets del sistema
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.draw.clip
-import com.example.paradigmaapp.android.ui.SettingsDialog
 import androidx.media3.common.C
 
 /**
@@ -50,7 +53,7 @@ import androidx.media3.common.C
 private const val PREFS_NAME = "PodcastPlaybackPrefs"
 private const val PREF_CURRENT_PODCAST_URL = "currentPodcastUrl"
 private const val PREF_IS_STREAM_ACTIVE = "isStreamActive"
-private const val PREF_PODCAST_POSITIONS = "podcastPositions" // Nuevo: Para guardar posiciones de todos los podcasts
+private const val PREF_PODCAST_POSITIONS = "podcastPositions"
 
 /**
  * Obtiene las SharedPreferences para guardar el estado de reproducción y ajustes
@@ -121,6 +124,7 @@ fun loadIsStreamActive(context: Context): Boolean {
     return getSharedPreferences(context).getBoolean(PREF_IS_STREAM_ACTIVE, true)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppScreen() {
     // Contexto y servicios
@@ -146,6 +150,55 @@ fun AppScreen() {
     var hasStreamLoadFailed by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
+    // Estado para la lista de dispositivos Bluetooth
+    val bluetoothDevices = remember { mutableStateListOf<String>() }
+    val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+
+    // Lanzador para solicitar permisos de Bluetooth
+    val requestBluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { permissions ->
+            if (permissions.all { it.value }) {
+                // Permisos concedidos, obtener lista de dispositivos
+                if (bluetoothAdapter?.isEnabled == true) {
+                    bluetoothDevices.clear()
+                    bluetoothAdapter.bondedDevices.forEach { device ->
+                        bluetoothDevices.add(device.name)
+                    }
+                }
+            } else {
+                Timber.d("Permisos de Bluetooth denegados")
+            }
+        }
+    )
+
+    // Función para verificar y solicitar permisos de Bluetooth
+    fun checkBluetoothPermissions() {
+        val permissionsToRequest = arrayOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT
+        )
+        val areAllGranted = permissionsToRequest.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (!areAllGranted) {
+            requestBluetoothPermissionLauncher.launch(permissionsToRequest)
+        } else {
+            // Permisos ya concedidos, obtener lista de dispositivos
+            if (bluetoothAdapter?.isEnabled == true) {
+                bluetoothDevices.clear()
+                bluetoothAdapter.bondedDevices.forEach { device ->
+                    bluetoothDevices.add(device.name)
+                }
+            }
+        }
+    }
+
+    // Llamar a la función para verificar permisos al iniciar la pantalla
+    LaunchedEffect(Unit) {
+        checkBluetoothPermissions()
+    }
+
     // Player de podcast con listeners para eventos
     val podcastExoPlayer = remember {
         ExoPlayer.Builder(context)
@@ -160,7 +213,11 @@ fun AppScreen() {
                         when (playbackState) {
                             Player.STATE_ENDED -> {
                                 currentPodcast?.let { podcast ->
-                                    savePodcastPosition(context, podcast.url, 0L) // Reset al terminar
+                                    savePodcastPosition(
+                                        context,
+                                        podcast.url,
+                                        0L
+                                    ) // Reset al terminar
                                 }
                             }
                         }
@@ -178,6 +235,11 @@ fun AppScreen() {
             }
     }
 
+    // Control volumen
+    val scaffoldState = rememberBottomSheetScaffoldState()
+    var showVolumeBottomSheet by remember { mutableStateOf(false) }
+    var currentVolumeState by remember { mutableFloatStateOf(podcastExoPlayer.volume) }
+
     // Listener para el player de streaming
     LaunchedEffect(andainaStreamPlayer.exoPlayer) {
         andainaStreamPlayer.exoPlayer?.addListener(object : Player.Listener {
@@ -191,40 +253,42 @@ fun AppScreen() {
         })
     }
 
-    // Cargar datos iniciales y estado guardado
-    LaunchedEffect(Unit) {
-        // Cargar lista de podcasts
-        try {
-            val allPodcasts = withContext(Dispatchers.IO) {
-                archiveService.fetchAllPodcasts("mario011")
-            }
-            initialPodcasts = allPodcasts
-            filteredPodcasts = allPodcasts
-            isLoadingInitial = false
-
-            // Cargar podcast actual guardado
-            val savedPodcastUrl = loadCurrentPodcast(context)
-            Timber.d("Loaded saved podcast URL: $savedPodcastUrl")
-            if (savedPodcastUrl != null) {
-                currentPodcast = allPodcasts.find { it.url == savedPodcastUrl }
-                Timber.d("Found podcast in list: ${currentPodcast?.title}")
-                currentPodcast?.let { podcast ->
-                    val savedPosition = getPodcastPosition(context, podcast.url)
-                    podcastExoPlayer.clearMediaItems()
-                    podcastExoPlayer.setMediaItem(MediaItem.fromUri(podcast.url), savedPosition)
-                    podcastExoPlayer.prepare()
-                    podcastExoPlayer.play()
-                    Timber.d("Attempting to play saved podcast: ${podcast.title}")
+    // Cargar datos iniciales y realizar el filtrado cuando searchText cambie
+    LaunchedEffect(Unit, searchText) {
+        // Cargar lista de podcasts inicial solo la primera vez
+        if (initialPodcasts.isEmpty()) {
+            try {
+                val allPodcasts = withContext(Dispatchers.IO) {
+                    archiveService.fetchAllPodcasts("mario011")
                 }
+                initialPodcasts = allPodcasts
+                // No asignamos directamente allPodcasts a filteredPodcasts aquí
+                isLoadingInitial = false
+
+                // Cargar podcast actual guardado
+                val savedPodcastUrl = loadCurrentPodcast(context)
+                Timber.d("Loaded saved podcast URL: $savedPodcastUrl")
+                if (savedPodcastUrl != null) {
+                    currentPodcast = allPodcasts.find { it.url == savedPodcastUrl }
+                    Timber.d("Found podcast in list: ${currentPodcast?.title}")
+                    currentPodcast?.let { podcast ->
+                        val savedPosition = getPodcastPosition(context, podcast.url)
+                        podcastExoPlayer.clearMediaItems()
+                        podcastExoPlayer.setMediaItem(MediaItem.fromUri(podcast.url), savedPosition)
+                        podcastExoPlayer.prepare()
+                        podcastExoPlayer.play()
+                        Timber.d("Attempting to play saved podcast: ${podcast.title}")
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.e("Error loading podcasts: $e")
+                isLoadingInitial = false
             }
-        } catch (e: Exception) {
-            Timber.e("Error loading podcasts: $e")
-            isLoadingInitial = false
         }
 
-        // Iniciar stream si está activo y no hay podcast cargado
-        if (isAndainaStreamActive && currentPodcast == null) {
-            andainaStreamPlayer.play()
+        // Realizar el filtrado cada vez que searchText cambie
+        filteredPodcasts = initialPodcasts.filter { podcast ->
+            podcast.title.contains(searchText, ignoreCase = true)
         }
     }
 
@@ -238,7 +302,8 @@ fun AppScreen() {
                 val duration = podcastExoPlayer.duration
                 val currentPos = podcastExoPlayer.currentPosition
                 podcastDuration = if (duration > 0 && duration != C.TIME_UNSET) duration else 0L
-                podcastProgress = if (podcastDuration > 0) currentPos.toFloat() / podcastDuration.toFloat() else 0f
+                podcastProgress =
+                    if (podcastDuration > 0) currentPos.toFloat() / podcastDuration.toFloat() else 0f
             } else {
                 podcastProgress = 0f
                 podcastDuration = 0L
@@ -293,6 +358,11 @@ fun AppScreen() {
         saveIsStreamActive(context, isAndainaStreamActive)
     }
 
+
+    LaunchedEffect(podcastExoPlayer.volume) {
+        currentVolumeState = podcastExoPlayer.volume
+    }
+
     // Limpieza al salir
     DisposableEffect(Unit) {
         onDispose {
@@ -306,137 +376,164 @@ fun AppScreen() {
         }
     }
 
-    // UI principal
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.navigationBars)
-    ) {
-        // Header con barra de búsqueda
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            SearchBar(
-                searchText = searchText,
-                onSearchTextChanged = { newText -> searchText = newText },
-                modifier = Modifier.weight(0.8f)
-            )
-
-            UserIcon(
-                onClick = { showSettingsDialog = true },
-                modifier = Modifier
-                    .size(48.dp)
-                    .padding(1.dp)
-                    .clip(CircleShape)
-            )
-        }
-
-        // Lista de podcasts
-        when {
-            isLoadingInitial -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+    // UI principal con BottomSheetScaffold
+    BottomSheetScaffold(
+        scaffoldState = scaffoldState,
+        sheetContent = {
+            VolumeControl(
+                player = podcastExoPlayer,
+                onVolumeChanged = { newVolume ->
+                    currentVolumeState = newVolume
+                    podcastExoPlayer.volume = newVolume
+                },
+                currentVolume = currentVolumeState,
+                availableBluetoothDevices = bluetoothDevices, // Pasar la lista de dispositivos
+                onBluetoothDeviceSelected = { deviceName ->
+                    // TODO: Implementar la lógica para cambiar el dispositivo de audio
+                    Timber.d("Dispositivo Bluetooth seleccionado: $deviceName")
+                    coroutineScope.launch { scaffoldState.bottomSheetState.hide() } // Ocultar al seleccionar
                 }
+            )
+        },
+        sheetPeekHeight = 0.dp // Oculta el BottomSheet inicialmente
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(MaterialTheme.colorScheme.background)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+        ) {
+            // Header con barra de búsqueda
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                SearchBar(
+                    searchText = searchText,
+                    onSearchTextChanged = { newText -> searchText = newText },
+                    modifier = Modifier.weight(0.8f)
+                )
+
+                UserIcon(onClick = { showSettingsDialog = true },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .padding(1.dp)
+                        .clip(CircleShape)
+                )
             }
 
-            filteredPodcasts.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = if (searchText.isBlank()) "No hay podcasts disponibles"
-                        else "No se encontraron resultados",
-                        fontSize = 18.sp,
-                        textAlign = TextAlign.Center
+            // Lista de podcasts
+            when {
+                isLoadingInitial -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                filteredPodcasts.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = if (searchText.isBlank()) "No hay podcasts disponibles"
+                            else "No se encontraron resultados",
+                            fontSize = 18.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                else -> {
+                    PodcastList(
+                        podcasts = filteredPodcasts,
+                        onPodcastSelected = { podcast ->
+                            currentPodcast =
+                                if (currentPodcast?.url == podcast.url) null else podcast
+                        },
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
 
-            else -> {
-                PodcastList(
-                    podcasts = filteredPodcasts,
-                    onPodcastSelected = { podcast ->
-                        currentPodcast = if (currentPodcast?.url == podcast.url) null else podcast
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // Controles de reproducción
-        AudioPlayer(
-            player = if (currentPodcast != null) podcastExoPlayer else andainaStreamPlayer.exoPlayer,
-            isPlaying = if (currentPodcast != null) isPodcastPlaying else isAndainaPlaying,
-            onPlayPauseClick = {
-                if (currentPodcast != null) {
-                    if (isPodcastPlaying) {
-                        podcastExoPlayer.pause()
+            // Controles de reproducción
+            AudioPlayer(
+                player = if (currentPodcast != null) podcastExoPlayer else andainaStreamPlayer.exoPlayer,
+                isPlaying = if (currentPodcast != null) isPodcastPlaying else isAndainaPlaying,
+                onPlayPauseClick = {
+                    if (currentPodcast != null) {
+                        if (isPodcastPlaying) {
+                            podcastExoPlayer.pause()
+                        } else {
+                            podcastExoPlayer.play()
+                        }
                     } else {
-                        podcastExoPlayer.play()
+                        if (isAndainaStreamActive) {
+                            if (isAndainaPlaying) {
+                                andainaStreamPlayer.pause()
+                            } else {
+                                andainaStreamPlayer.play()
+                            }
+                        }
                     }
-                } else {
-                    if (isAndainaStreamActive) {
+                },
+                progress = podcastProgress,
+                onProgressChange = { newProgress ->
+                    if (currentPodcast != null && podcastDuration > 0) {
+                        seekJob?.cancel()
+                        seekJob = coroutineScope.launch {
+                            delay(100)
+                            val newPosition = (newProgress * podcastDuration).toLong()
+                            podcastExoPlayer.seekTo(newPosition)
+                            savePodcastPosition(context, currentPodcast!!.url, newPosition)
+                        }
+                    }
+                },
+                isLiveStream = currentPodcast == null,
+                podcastTitle = currentPodcast?.title,
+                podcastImage = R.mipmap.logo, // TODO: Reemplazar con la lógica real
+                isAndainaPlaying = isAndainaPlaying,
+                onPlayStreamingClick = { // Lambda para controlar el stream
+                    if (currentPodcast == null) {
                         if (isAndainaPlaying) {
                             andainaStreamPlayer.pause()
                         } else {
-                            andainaStreamPlayer.play()
+                            if (isAndainaStreamActive) {
+                                andainaStreamPlayer.play()
+                            }
                         }
-                    }
-                }
-            },
-            progress = podcastProgress,
-            onProgressChange = { newProgress ->
-                if (currentPodcast != null && podcastDuration > 0) {
-                    seekJob?.cancel()
-                    seekJob = coroutineScope.launch {
-                        delay(100)
-                        val newPosition = (newProgress * podcastDuration).toLong()
-                        podcastExoPlayer.seekTo(newPosition)
-                        savePodcastPosition(context, currentPodcast!!.url, newPosition)
-                    }
-                }
-            },
-            isLiveStream = currentPodcast == null,
-            podcastTitle = currentPodcast?.title,
-            podcastImage = R.mipmap.logo, // TODO: Reemplazar con la lógica real
-            isAndainaPlaying = isAndainaPlaying,
-            onPlayStreamingClick = { // Lambda para controlar el stream
-                if (currentPodcast == null) {
-                    if (isAndainaPlaying) {
-                        andainaStreamPlayer.pause()
                     } else {
-                        if (isAndainaStreamActive) {
-                            andainaStreamPlayer.play()
+                        savePodcastPosition(context, currentPodcast!!.url, podcastExoPlayer.currentPosition)
+                        currentPodcast = null // Esto detendrá el podcast y, si isAndainaStreamActive es true, iniciará el stream
+                    }
+                },
+                onPodcastInfoClick = {
+                    currentPodcast?.let {
+                        if (!podcastExoPlayer.isPlaying) { // Evitar llamadas redundantes si ya está reproduciendo
+                            podcastExoPlayer.play()
                         }
                     }
-                } else {
-                    savePodcastPosition(context, currentPodcast!!.url, podcastExoPlayer.currentPosition)
-                    currentPodcast = null // Esto detendrá el podcast y, si isAndainaStreamActive es true, iniciará el stream
-                }
-            },
-            onPodcastInfoClick = {
-                currentPodcast?.let {
-                    if (!podcastExoPlayer.isPlaying) { // Evitar llamadas redundantes si ya está reproduciendo
-                        podcastExoPlayer.play()
+                },
+                onVolumeIconClick = {
+                    coroutineScope.launch {
+                        scaffoldState.bottomSheetState.expand()
                     }
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
-    // Diálogo de ajustes
-    if (showSettingsDialog) {
-        SettingsDialog(
-            onDismissRequest = { showSettingsDialog = false },
-            isStreamActive = isAndainaStreamActive,
-            onStreamActiveChanged = { isActive ->
-                isAndainaStreamActive = isActive
-            }
-        )
+        // Diálogo de ajustes
+        if (showSettingsDialog) {
+            SettingsDialog(
+                onDismissRequest = { showSettingsDialog = false },
+                isStreamActive = isAndainaStreamActive,
+                onStreamActiveChanged = { isActive ->
+                    isAndainaStreamActive = isActive
+                }
+            )
+        }
     }
 }
