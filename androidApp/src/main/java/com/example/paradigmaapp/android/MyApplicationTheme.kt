@@ -71,6 +71,6 @@ fun MyApplicationTheme(
     MaterialTheme(
         colorScheme = colorScheme, // Esquema de colores a aplicar.
         content = content // Contenido al que se aplica el tema.
-        // Puedes añadir typography y shapes aquí si los defines en tu tema.
+        // TODO: Añadir tipografía y formas personalizadas.
     )
 }

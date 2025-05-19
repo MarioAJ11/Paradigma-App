@@ -38,7 +38,6 @@ fun AudioPlayer(
     onPodcastInfoClick: () -> Unit = {},
     onVolumeIconClick: () -> Unit = {}
 ) {
-    var showVolumeControls by remember { mutableStateOf(false) }
     var currentVolume by remember { mutableFloatStateOf(player?.volume ?: 0f) }
     var showProgressCircle by remember { mutableStateOf(false) }
     var progressCirclePosition by remember { mutableStateOf(0f) }
@@ -48,15 +47,17 @@ fun AudioPlayer(
     }
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
         shape = RoundedCornerShape(8.dp)
     ) {
         Column(
             modifier = Modifier
-                .padding(16.dp)
+                .padding(8.dp)
                 .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -103,7 +104,7 @@ fun AudioPlayer(
                             modifier = Modifier.size(32.dp)
                         )
                     }
-                    IconButton(onClick = { onVolumeIconClick() }) { // <---- USA LA LAMBDA RECIBIDA
+                    IconButton(onClick = { onVolumeIconClick() }) {
                         Icon(
                             painter = painterResource(id = R.mipmap.volume),
                             contentDescription = "Volume Control",

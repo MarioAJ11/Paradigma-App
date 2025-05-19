@@ -7,6 +7,8 @@ import androidx.activity.compose.setContent
 /**
  * Actividad principal de la aplicación.
  * Utiliza Jetpack Compose para construir la interfaz de usuario.
+ *
+ * @author Mario Alguacil Juárez
  */
 class MainActivity : ComponentActivity() {
     /**
