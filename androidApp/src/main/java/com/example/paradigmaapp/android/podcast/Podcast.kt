@@ -8,6 +8,8 @@ package com.example.paradigmaapp.android.podcast
  * @property imageUrl URL de la imagen de portada (puede ser null)
  * @property duration Duración formateada (MM:SS)
  * @property identifier Indetificador
+ *
+ * @author Mario Alguacil Juárez
  */
 data class Podcast(
     val title: String,

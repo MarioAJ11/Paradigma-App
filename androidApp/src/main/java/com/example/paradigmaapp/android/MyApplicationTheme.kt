@@ -58,6 +58,8 @@ private val LightColorScheme = lightColorScheme(
  *
  * @param darkTheme Booleano que indica si se debe usar el tema oscuro. Por defecto, usa la configuración del sistema.
  * @param content El contenido Composable al que se aplicará el tema.
+ *
+ * @author Mario Alguacil Juárez
  */
 @Composable
 fun MyApplicationTheme(

@@ -38,7 +38,7 @@ import com.example.paradigmaapp.android.audio.VolumeControl
 import com.example.paradigmaapp.android.podcast.Podcast
 import com.example.paradigmaapp.android.podcast.PodcastList
 import com.example.paradigmaapp.android.ui.SearchBar
-import com.example.paradigmaapp.android.ui.SettingsDialog
+import com.example.paradigmaapp.android.ui.SettingsScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -630,7 +630,7 @@ fun AppScreen() {
 
         // Diálogo de ajustes, mostrado condicionalmente.
         if (showSettingsDialog) {
-            SettingsDialog(
+            SettingsScreen(
                 onDismissRequest = { showSettingsDialog = false },
                 isStreamActive = isAndainaStreamActive,
                 onStreamActiveChanged = { isActive ->

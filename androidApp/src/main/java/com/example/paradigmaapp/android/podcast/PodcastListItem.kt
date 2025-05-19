@@ -26,14 +26,13 @@ import coil.compose.AsyncImage
 import androidx.compose.material3.MaterialTheme
 
 /**
- * [PodcastListItem] composable renders a single podcast item in a list.
- * It displays the podcast's cover image, title, and duration.
- * A [CircularProgressIndicator] is shown as long as the title is empty,
- * indicating that the basic podcast information is still being loaded.
+ * Composable que representa un elemento individual en la lista de podcasts.
+ * Muestra la carátula, título y duración del podcast, y permite la selección al hacer clic.
  *
- * @param podcast The [Podcast] data object to be displayed.
- * @param onPodcastSelected Callback triggered when this item is clicked,
- * passing the selected [Podcast] to the caller (e.g., [PodcastList]).
+ * @param podcast El [Podcast] que se va a mostrar en la lista.
+ * @param onPodcastSelected Lambda que se invoca al hacer clic en este elemento, recibiendo el [Podcast] seleccionado.
+ *
+ * @author Mario Alguacil Juárez
  */
 @Composable
 fun PodcastListItem(podcast: Podcast, onPodcastSelected: (Podcast) -> Unit) {

@@ -26,6 +26,8 @@ import java.net.URLEncoder
  * Utiliza [io.ktor.client.HttpClient] de Ktor para realizar las peticiones de red de forma asíncrona.
  * Implementa una estrategia para obtener primero una lista básica de podcasts
  * y luego obtener los detalles de cada uno, utilizando una caché en memoria para optimizar.
+ *
+ * @author Mario Alguacil Juárez
  */
 class ArchiveService { // Mantén la instancia del cliente aquí
 

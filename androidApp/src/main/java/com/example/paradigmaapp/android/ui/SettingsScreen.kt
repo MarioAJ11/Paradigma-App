@@ -6,12 +6,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontVariation
 
 /**
  * Composable que muestra un diálogo simple para ajustes, ahora con un enlace a la web y control de streaming.
+ *
+ * @param onDismissRequest Lambda que se invoca cuando se cierra el diálogo.
+ * @param isStreamActive Indica si el streaming está activo o no.
+ * @param onStreamActiveChanged Lambda que se invoca cuando el estado de streaming cambia.
+ *
+ * @author Mario Alguacil Juárez
  */
 @Composable
-fun SettingsDialog(
+fun SettingsScreen(
     onDismissRequest: () -> Unit,
     isStreamActive: Boolean,
     onStreamActiveChanged: (Boolean) -> Unit
