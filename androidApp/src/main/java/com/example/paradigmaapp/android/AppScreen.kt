@@ -24,7 +24,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -76,7 +75,7 @@ fun getSharedPreferences(context: Context): SharedPreferences {
  *
  * @param context El contexto de la aplicación.
  * @param podcastUrl La URL del podcast del que se guarda la posición.
- * @param positionMillis La posición de reproducción en milisegundos.
+ * @param positionMillis La posición de reproducción en milisegegundos.
  */
 fun savePodcastPosition(context: Context, podcastUrl: String, positionMillis: Long) {
     val prefs = getSharedPreferences(context)
@@ -461,13 +460,13 @@ fun AppScreen() {
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
-                .windowInsetsPadding(WindowInsets.navigationBars) // Aplica padding para evitar la barra de navegación.
+                .windowInsetsPadding(WindowInsets.navigationBars)
         ) {
-            // Sección superior de la pantalla con la barra de búsqueda y ajustes.
+            // Sección superior de la pantalla con la barra de búsqueda
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars) // Aplica padding para evitar la barra de estado.
+                    .windowInsetsPadding(WindowInsets.statusBars)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -486,12 +485,14 @@ fun AppScreen() {
                 )
             }
 
-            // Contenido principal: la lista de podcasts.
+            // Lista de podcasts.
             when {
                 isLoadingInitial -> {
                     // Muestra un indicador de carga mientras se obtienen los podcasts iniciales.
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary // Asegura que el color sea primario
+                        )
                     }
                 }
 
@@ -501,7 +502,8 @@ fun AppScreen() {
                         Text(
                             text = if (searchText.isBlank()) "No hay podcasts disponibles"
                             else "No se encontraron resultados",
-                            fontSize = 18.sp,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -514,13 +516,13 @@ fun AppScreen() {
                         onPodcastSelected = { podcast ->
                             // Lógica al hacer clic en un podcast de la lista.
                             if (currentPodcast?.url == podcast.url) {
-                                // Si el podcast ya está seleccionado...
+                                // Si el podcast ya está seleccionado
                                 if (podcastExoPlayer.playbackState == Player.STATE_ENDED) {
-                                    // ...y la reproducción ha finalizado, reinicia la reproducción.
+                                    // y la reproducción ha finalizado, reinicia la reproducción.
                                     podcastExoPlayer.seekTo(0L)
                                     podcastExoPlayer.play()
                                 } else {
-                                    // ...si está reproduciéndose o pausado, deselecciónalo.
+                                    // si está reproduciéndose o pausado, deselecciónalo.
                                     currentPodcast = null
                                 }
                             } else {
@@ -570,7 +572,7 @@ fun AppScreen() {
                 },
                 isLiveStream = currentPodcast == null, // Indica si se está reproduciendo un stream en vivo.
                 podcastTitle = currentPodcast?.title,
-                podcastImage = R.mipmap.imagen, // TODO: Reemplazar con la lógica real para la imagen del podcast.
+                podcastImage = currentPodcast?.imageUrl,
                 isAndainaPlaying = isAndainaPlaying,
                 onPlayStreamingClick = {
                     // Controla la reproducción del stream de Andaina cuando no hay un podcast seleccionado.
@@ -609,18 +611,31 @@ fun AppScreen() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface) // Fondo para el menú de navegación inferior
                     .padding(top = 8.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { /* TODO: Implementar "Seguir Viendo" */ }) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "Seguir Viendo")
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = "Seguir Viendo",
+                        tint = MaterialTheme.colorScheme.onSurface // Color del icono
+                    )
                 }
                 IconButton(onClick = { /* TODO: Implementar "Descargas" */ }) {
-                    Icon(Icons.Filled.Download, contentDescription = "Descargas")
+                    Icon(
+                        Icons.Filled.Download,
+                        contentDescription = "Descargas",
+                        tint = MaterialTheme.colorScheme.onSurface // Color del icono
+                    )
                 }
                 IconButton(onClick = { /* TODO: Implementar "Cola" */ }) {
-                    Icon(Icons.Filled.List, contentDescription = "Cola")
+                    Icon(
+                        Icons.Filled.List,
+                        contentDescription = "Cola",
+                        tint = MaterialTheme.colorScheme.onSurface // Color del icono
+                    )
                 }
                 IconButton(onClick = { showSettingsDialog = true }) {
                     Icon(Icons.Filled.Settings, contentDescription = "Ajustes")

@@ -76,36 +76,35 @@ class ArchiveService { // Mantén la instancia del cliente aquí
                 totalAvailable = total
                 Log.d("ArchiveService", "🔍 Encontrados ${podcastsFromPage.size} podcasts en la página $page (Total: $totalAvailable)")
 
-                // Primero, añadimos los podcasts de la búsqueda a la caché con la info básica.
-                // Esto es útil si fetchPodcastDetails falla, tenemos al menos la info inicial.
-                podcastsFromPage.forEach { podcast ->
-                    podcastCache.putIfAbsent(podcast.identifier, podcast)
-                }
-
                 val detailRequests = withContext(Dispatchers.IO) {
                     podcastsFromPage.map { podcast ->
                         async {
-                            // Intentamos obtener de la caché primero
-                            podcastCache[podcast.identifier]?.let { cachedPodcast ->
-                                // Si ya está en caché con una URL (indicando detalles completos), úsala.
-                                if (cachedPodcast.url.isNotEmpty()) {
-                                    return@async cachedPodcast
-                                }
-                            }
+                            // Intentamos obtener de la caché.
+                            val cachedPodcast = podcastCache[podcast.identifier]
 
-                            // Si no está en caché o no tiene URL, obtenemos los detalles.
-                            fetchPodcastDetails(podcast.identifier)?.also { detailedPodcast ->
-                                // Actualizamos la caché con los detalles completos.
-                                podcastCache[podcast.identifier] = detailedPodcast
-                            } ?: podcastCache[podcast.identifier] // Si falla, devuelve la versión básica de la caché.
-                            ?: podcast // Si tampoco está en caché (raro), devuelve la versión de la búsqueda.
+                            // Si el podcast NO está en caché O le faltan detalles importantes (URL, Imagen, Duración real)
+                            val shouldFetchDetails = cachedPodcast == null ||
+                                    cachedPodcast.url.isEmpty() ||
+                                    cachedPodcast.imageUrl.isNullOrEmpty() ||
+                                    cachedPodcast.duration == "--:--" // Considerar que no tiene duración real
+
+                            if (shouldFetchDetails) {
+                                fetchPodcastDetails(podcast.identifier)?.also { detailedPodcast ->
+                                    // Actualizamos la caché con los detalles completos.
+                                    podcastCache[podcast.identifier] = detailedPodcast
+                                } ?: (cachedPodcast // Si falla la obtención de detalles, usar la versión de la caché (si existe)
+                                    ?: podcastCache.putIfAbsent(podcast.identifier, podcast) // O la básica de la búsqueda (y cachearla)
+                                    ?: podcast) // O la versión de la búsqueda (si putIfAbsent devuelve null)
+                            } else {
+                                cachedPodcast // Usar la versión de la caché que ya tiene todos los detalles
+                            }
                         }
                     }
                 }
                 val detailedPodcasts = detailRequests.awaitAll()
 
                 // Solo añade los podcasts que obtuvimos (ya sean detallados o básicos si falló la descarga de detalles)
-                allPodcasts.addAll(detailedPodcasts.filterNotNull()) // Filter out any potential nulls if a request somehow returned null
+                allPodcasts.addAll(detailedPodcasts.filterNotNull())
 
                 totalProcessed += podcastsFromPage.size
 
@@ -117,12 +116,13 @@ class ArchiveService { // Mantén la instancia del cliente aquí
             Log.i("ArchiveService", "Descargados ${allPodcasts.size} podcasts con detalles (con caché)")
         } catch (e: Exception) {
             Log.e("ArchiveService", "Error general al recuperar podcasts", e)
-            // En caso de error, intentar devolver lo que haya en caché.
-            if (allPodcasts.isEmpty()) {
+            // En caso de error, intentar devolver lo que haya en caché, si es que hay algo.
+            if (allPodcasts.isEmpty() && podcastCache.isNotEmpty()) {
+                Log.w("ArchiveService", "Devolviendo podcasts desde caché debido a un error.")
                 return podcastCache.values.toList()
             }
         }
-        return allPodcasts
+        return allPodcasts.distinctBy { it.identifier } // Asegurarse de que no haya duplicados si algo sale mal con la caché
     }
 
     /**
@@ -174,20 +174,20 @@ class ArchiveService { // Mantén la instancia del cliente aquí
                 val jsonObject = element.jsonObject
                 val identifier = jsonObject["identifier"]?.toString()?.trim('"') ?: ""
                 val rawTitle = jsonObject["title"]?.toString()?.trim('"') ?: "Sin título"
-                // Intentamos obtener la duración de la respuesta de búsqueda
                 val rawDuration = jsonObject["duration"]?.toString()?.trim('"')
 
-                // Creamos un objeto Podcast con la información inicial, incluyendo la duración si está disponible.
+                // Creamos un objeto Podcast con la información inicial.
+                // imageUrl y url serán vacías/null y se llenarán en fetchPodcastDetails.
                 Podcast(
                     title = rawTitle,
-                    url = "", // La URL del audio se obtiene en los detalles.
-                    imageUrl = null, // La URL de la imagen se obtiene en los detalles.
-                    duration = formatDuration(rawDuration), // Formateamos la duración encontrada aquí.
+                    url = "",
+                    imageUrl = null, // Inicialmente null
+                    duration = formatDuration(rawDuration), // Formateamos la duración de la búsqueda (puede ser imprecisa)
                     identifier = identifier
                 )
             } catch (e: Exception) {
                 Log.e("ArchiveService", "Error processing search result item: $e", e)
-                null // Ignora este elemento si falla su procesamiento.
+                null
             }
         }
         return Pair(podcasts, totalResults)
@@ -208,7 +208,7 @@ class ArchiveService { // Mantén la instancia del cliente aquí
             processMetadataResponse(response, identifier)
         } catch (e: Exception) {
             Log.e("ArchiveService", "Error al obtener metadatos de $identifier", e)
-            null // Devuelve null si falla la petición de metadatos.
+            null
         }
     }
 
@@ -236,48 +236,58 @@ class ArchiveService { // Mantén la instancia del cliente aquí
             return null
         }
 
-        if (files == null) {
-            Log.w("ArchiveService", "El campo 'files' no es un JsonArray o no existe para $identifier")
-            // A veces los metadatos existen pero no hay archivos. Podemos intentar crear un podcast
-            // básico si la caché ya tiene uno, aunque no tenga URL de audio.
-            return podcastCache[identifier]?.copy(
-                title = metadata["title"]?.toString()?.trim('"') ?: "Sin título",
-                imageUrl = findCoverImage(identifier), // Intentar encontrar imagen aunque no haya audio
-                // Mantenemos la duración que ya teníamos si existía.
-                duration = podcastCache[identifier]?.duration ?: formatDuration(metadata["length"]?.toString()?.trim('"') ?: metadata["duration"]?.toString()?.trim('"'))
-            ) // Si no está en caché, no podemos crear uno sin audio URL.
+        val rawTitle = metadata["title"]?.toString()?.trim('"') ?: "Sin título"
+
+        // *** CAMBIO CLAVE 1: Extraer duración del archivo de audio si está disponible ***
+        var finalDuration = "--:--"
+        val audioFileObject = files?.firstOrNull {
+            val format = it.jsonObject["format"]?.toString()?.trim('"') ?: ""
+            val name = it.jsonObject["name"]?.toString()?.trim('"') ?: ""
+            format.contains("mp3", ignoreCase = true) ||
+                    format.contains("ogg", ignoreCase = true) ||
+                    format.contains("m4a", ignoreCase = true) ||
+                    format.contains("aac", ignoreCase = true) ||
+                    format.contains("wav", ignoreCase = true) ||
+                    name.endsWith(".mp3", ignoreCase = true) ||
+                    name.endsWith(".ogg", ignoreCase = true) ||
+                    name.endsWith(".m4a", ignoreCase = true) ||
+                    name.endsWith(".aac", ignoreCase = true) ||
+                    name.endsWith(".wav", ignoreCase = true)
         }
 
-        val rawTitle = metadata["title"]?.toString()?.trim('"') ?: "Sin título"
-        // Preferimos la duración de 'length' o 'duration' en los metadatos si están presentes.
-        // Si no, mantenemos la que pudimos obtener en la búsqueda.
-        val durationFromMetadata = metadata["length"]?.toString()?.trim('"') ?: metadata["duration"]?.toString()?.trim('"')
+        val audioDurationFromFiles = audioFileObject?.jsonObject?.get("length")?.toString()?.trim('"')
+        if (!audioDurationFromFiles.isNullOrBlank()) {
+            finalDuration = formatDuration(audioDurationFromFiles)
+        } else {
+            // Si no se encuentra en el archivo de audio, intentar con el metadata general (aunque dijiste que no estaba en tu JSON)
+            val durationFromMetadata = metadata["length"]?.toString()?.trim('"') ?: metadata["duration"]?.toString()?.trim('"')
+            if (!durationFromMetadata.isNullOrBlank()) {
+                finalDuration = formatDuration(durationFromMetadata)
+            }
+        }
+        // ********************************************************************************
 
         val audioUrl = findAudioUrlFromMetadata(files, identifier)
         if (audioUrl == null) {
-            Log.w("ArchiveService", "No se encontró archivo de audio en metadatos para $identifier")
-            // Si no hay archivo de audio, no podemos reproducir, consideramos que no es un podcast válido para detalles completos.
-            // Podríamos devolver la versión básica de la caché si existe, pero null indica fallo en obtener detalles.
+            Log.w("ArchiveService", "No se encontró archivo de audio en metadatos para $identifier. No se puede crear un Podcast completo.")
+            // Si no hay archivo de audio, no podemos reproducir, consideramos que no es un podcast válido.
             return null
         }
 
-        val imageUrl = findCoverImage(identifier)
+        // *** CAMBIO CLAVE 2: Pasar los 'files' a findCoverImage para una búsqueda más precisa ***
+        val imageUrl = findCoverImage(identifier, files)
 
-        // Buscamos si ya existe una instancia en la caché para actualizarla,
-        // o creamos una nueva si no (debería existir por la lógica de fetchAllPodcasts).
-        return podcastCache[identifier]?.copy(
+        // Crear una nueva instancia de Podcast con todos los detalles confirmados
+        val detailedPodcast = Podcast(
             title = rawTitle,
             url = audioUrl,
             imageUrl = imageUrl,
-            // Usamos la duración de los metadatos si está disponible, de lo contrario, la de la búsqueda inicial.
-            duration = formatDuration(durationFromMetadata ?: podcastCache[identifier]?.duration?.let { if (it == "--:--") null else it } )
-        ) ?: Podcast( // Si no existe en la caché (raro), creamos una nueva instancia.
-            title = rawTitle,
-            url = audioUrl,
-            imageUrl = imageUrl,
-            duration = formatDuration(durationFromMetadata ?: ""), // Si no está en metadata, usamos vacío y formatDuration lo manejará
+            duration = finalDuration,
             identifier = identifier
-        ).also { podcastCache[identifier] = it } // Asegurarnos de que la nueva instancia también se cachea.
+        )
+        // No necesitamos buscar en la caché aquí, simplemente creamos la versión completa
+        // y la caché se actualizará en fetchAllPodcasts.
+        return detailedPodcast
     }
 
     /**
@@ -288,47 +298,90 @@ class ArchiveService { // Mantén la instancia del cliente aquí
      * @param identifier El identificador del item para construir la URL de descarga.
      * @return La URL del archivo de audio o null si no se encuentra ninguno.
      */
-    private fun findAudioUrlFromMetadata(files: JsonArray, identifier: String): String? {
-        return files.firstOrNull {
+    private fun findAudioUrlFromMetadata(files: JsonArray?, identifier: String): String? {
+        return files?.firstOrNull {
             val format = it.jsonObject["format"]?.toString()?.trim('"') ?: ""
-            format.contains("audio", ignoreCase = true) ||
-                    format.contains("mp3", ignoreCase = true) ||
+            val name = it.jsonObject["name"]?.toString()?.trim('"') ?: ""
+            // Añade más formatos si es necesario según lo que veas en la API
+            format.contains("mp3", ignoreCase = true) ||
                     format.contains("ogg", ignoreCase = true) ||
                     format.contains("m4a", ignoreCase = true) ||
-                    format.contains("sound", ignoreCase = true) // Añadir otros formatos comunes si es necesario
+                    format.contains("aac", ignoreCase = true) ||
+                    format.contains("wav", ignoreCase = true) ||
+                    format.contains("audio", ignoreCase = true) || // Mantener por si acaso
+                    format.contains("sound", ignoreCase = true) || // Mantener por si acaso
+                    // Considerar también la extensión del nombre del archivo si 'format' no es explícito
+                    name.endsWith(".mp3", ignoreCase = true) ||
+                    name.endsWith(".ogg", ignoreCase = true) ||
+                    name.endsWith(".m4a", ignoreCase = true) ||
+                    name.endsWith(".aac", ignoreCase = true) ||
+                    name.endsWith(".wav", ignoreCase = true)
         }?.jsonObject?.get("name")?.toString()?.trim('"')?.let { fileName ->
             "https://archive.org/download/$identifier/$fileName"
         }
     }
 
     /**
-     * Intenta construir la URL de la imagen de portada del podcast utilizando convenciones comunes
-     * de nombres de archivo en archive.org.
+     * Intenta construir la URL de la imagen de portada del podcast utilizando los archivos disponibles
+     * en la respuesta de metadatos y convenciones comunes de nombres de archivo en archive.org.
      *
      * @param identifier El identificador del item.
+     * @param files El [kotlinx.serialization.json.JsonArray] que contiene la información de los archivos.
      * @return La URL de la imagen de portada o null si no se puede construir.
      */
-    private fun findCoverImage(identifier: String): String? {
+    private fun findCoverImage(identifier: String, files: JsonArray?): String? {
         val baseUrl = "https://archive.org/download/$identifier"
-        // Nombres comunes de imágenes de portada en archive.org
-        val possibleCoverNames = listOf(
-            "${identifier}_thumb.jpg", // Miniatura generada automáticamente
-            "${identifier}.jpg",        // Imagen principal con el mismo nombre del item
-            "cover.jpg",              // Nombre común de archivo de portada
-            "thumb.jpg",              // Otro nombre común para miniaturas
-            "album_art.jpg",          // Nombre común para arte de álbum
-            "folder.jpg"              // Otro nombre común (menos probable para podcasts)
-        )
-        // Simplemente construimos las URLs. La verificación de si existen se haría
-        // idealmente con una petición HEAD, pero por simplicidad, asumimos
-        // que si una de estas URLs existe, es la imagen.
-        return possibleCoverNames.firstOrNull { name ->
-            // Podrías añadir lógica aquí para verificar la existencia de la imagen si es crucial,
-            // pero generalmente, si el item tiene una portada, usa una de estas convenciones.
-            true // Simplemente usa el primer nombre posible para construir la URL
-        }?.let { coverName ->
-            "$baseUrl/${coverName.encodeUrl()}" // Codificar el nombre del archivo por si acaso
+        val possibleImageExtensions = listOf("jpg", "jpeg", "png", "gif") // Añadido jpeg por completitud
+
+        // *** CAMBIO CLAVE 3: Priorizar la búsqueda de imágenes directamente en los 'files' ***
+        // 1. Buscar por formatos conocidos de imagen
+        files?.firstOrNull { file ->
+            val format = file.jsonObject["format"]?.toString()?.trim('"') ?: ""
+            possibleImageExtensions.any { ext -> format.contains(ext, ignoreCase = true) } ||
+                    format.contains("thumbnail", ignoreCase = true) || // Incluir Item Tile / Item Image
+                    format.contains("item tile", ignoreCase = true)
+        }?.jsonObject?.get("name")?.toString()?.trim('"')?.let { fileName ->
+            Log.d("ArchiveService", "Imagen encontrada por formato en files: $fileName")
+            return "$baseUrl/${fileName.encodeUrl()}"
         }
+
+        // 2. Si no se encontró por formato, buscar por nombres convencionales o derivados.
+        // Esto es útil para imágenes que quizás no tienen un "format" explícito de imagen
+        // o si queremos priorizar ciertos nombres.
+        val audioFileNameWithoutExt = files?.firstOrNull {
+            val name = it.jsonObject["name"]?.toString()?.trim('"') ?: ""
+            name.endsWith(".mp3", ignoreCase = true) || name.endsWith(".ogg", ignoreCase = true) || name.endsWith(".m4a", ignoreCase = true)
+        }?.jsonObject?.get("name")?.toString()?.trim('"')?.substringBeforeLast('.')
+
+        val possibleBaseNames = mutableListOf(
+            identifier,           // "item_identifier.jpg"
+            "${identifier}_thumb",// "item_identifier_thumb.jpg"
+            "cover",              // "cover.jpg"
+            "thumb",              // "thumb.jpg"
+            "album_art",          // "album_art.jpg"
+            "folder",             // "folder.jpg"
+            "logo",               // "logo.jpg"
+            "image",              // "image.png"
+            "__ia_thumb",         // Agregado específicamente para "__ia_thumb.jpg"
+        )
+        if (audioFileNameWithoutExt != null) {
+            possibleBaseNames.add(0, audioFileNameWithoutExt) // Añadir al principio para probar primero
+        }
+
+
+        for (baseName in possibleBaseNames.distinct()) { // distinct() para evitar duplicados si audioFileNameWithoutExt coincide
+            for (ext in possibleImageExtensions) {
+                val potentialUrl = "$baseUrl/${baseName.encodeUrl()}.$ext"
+                Log.d("ArchiveService", "Intentando URL de imagen: $potentialUrl")
+
+                // Opcional: Podrías considerar una petición HEAD aquí para verificar si la imagen existe.
+                // Sin embargo, para mantener el rendimiento y la simplicidad, a menudo se asume que
+                // si la URL se construye correctamente, la imagen existe. Coil se encargará del fallo
+                // si la URL es 404.
+                return potentialUrl // Devolvemos la primera URL encontrada y construida.
+            }
+        }
+        return null // Si ninguna combinación de nombres o formatos funciona.
     }
 
     /**
@@ -342,7 +395,7 @@ class ArchiveService { // Mantén la instancia del cliente aquí
     private fun formatDuration(rawDuration: String?): String {
         if (rawDuration.isNullOrBlank()) return "--:--"
         return try {
-            val secondsFloat = rawDuration.toFloat() // Intenta como float primero por si acaso
+            val secondsFloat = rawDuration.toFloat()
             if (secondsFloat.isNaN() || secondsFloat.isInfinite() || secondsFloat < 0) return "--:--"
             val totalSeconds = secondsFloat.toLong()
 
@@ -357,7 +410,7 @@ class ArchiveService { // Mantén la instancia del cliente aquí
             }
         } catch (e: NumberFormatException) {
             Log.w("ArchiveService", "Cannot parse duration '$rawDuration' as number: ${e.message}")
-            "--:--" // Valor por defecto en caso de error de formato.
+            "--:--"
         } catch (e: Exception) {
             Log.e("ArchiveService", "Error formatting duration '$rawDuration': ${e.message}")
             "--:--"

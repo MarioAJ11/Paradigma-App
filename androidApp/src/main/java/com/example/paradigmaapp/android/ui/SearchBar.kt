@@ -25,26 +25,63 @@ fun SearchBar(
     onSearchTextChanged: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Definir los colores para OutlinedTextField usando MaterialTheme.colorScheme
+    val customTextFieldColors = OutlinedTextFieldDefaults.colors(
+        // Colores del borde
+        focusedBorderColor = MaterialTheme.colorScheme.primary, // Borde cuando está enfocado
+        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant, // Borde cuando no está enfocado
+        errorBorderColor = MaterialTheme.colorScheme.error, // Color del borde en estado de error
+
+        // Colores del texto de entrada
+        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+        errorTextColor = MaterialTheme.colorScheme.error,
+
+        // Colores de la etiqueta (label)
+        focusedLabelColor = MaterialTheme.colorScheme.primary, // Etiqueta cuando está enfocado
+        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant, // Etiqueta cuando no está enfocado
+        errorLabelColor = MaterialTheme.colorScheme.error,
+
+        // Colores del icono principal (leadingIcon)
+        focusedLeadingIconColor = MaterialTheme.colorScheme.primary, // Icono cuando está enfocado
+        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant, // Icono cuando no está enfocado
+        errorLeadingIconColor = MaterialTheme.colorScheme.error,
+
+        // Puedes añadir más si necesitas customizar el trailingIcon, cursor, placeholder, etc.
+    )
+
     OutlinedTextField(
-        value = searchText, // Muestra el texto que le pasas
-        onValueChange = onSearchTextChanged, // Llama a este callback cada vez que el usuario escribe
-        label = { Text("Buscar...") },
+        value = searchText,
+        onValueChange = onSearchTextChanged,
+        label = {
+            Text("Buscar...")
+            // El color del texto de la etiqueta ya lo hemos definido en customTextFieldColors.
+            // Si necesitaras un color diferente que no esté en el default, lo pondrías aquí
+            // color = MaterialTheme.colorScheme.onSurfaceVariant
+        },
         leadingIcon = {
             Icon(
                 Icons.Default.Search,
-                contentDescription = "Icono de búsqueda"
+                contentDescription = "Icono de búsqueda",
+                // El tint del icono también se controla por customTextFieldColors.
+                // Si necesitaras un tint diferente, lo pondrías aquí
+                // tint = MaterialTheme.colorScheme.onSurface
             )
         },
         shape = RoundedCornerShape(28.dp),
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp),
+        colors = customTextFieldColors // Aplicar los colores personalizados
     )
 }
 
 @Preview(showBackground = true)
 @Composable
 fun PreviewSearchBar() {
-    var searchText by remember { mutableStateOf("") }
-    SearchBar(searchText = searchText, onSearchTextChanged = { searchText = it })
+    // Asegúrate de envolver tu preview con tu tema para que los colores se apliquen
+    com.example.paradigmaapp.android.MyApplicationTheme {
+        var searchText by remember { mutableStateOf("") }
+        SearchBar(searchText = searchText, onSearchTextChanged = { searchText = it })
+    }
 }

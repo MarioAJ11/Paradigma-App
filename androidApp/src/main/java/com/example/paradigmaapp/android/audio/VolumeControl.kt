@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.ExoPlayer
@@ -43,7 +44,11 @@ fun VolumeControl(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Control de Volumen", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Control de Volumen",
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground
+        )
 
         // Slider con iconos
         Row(
@@ -53,7 +58,8 @@ fun VolumeControl(
             Icon(
                 painter = painterResource(id = R.mipmap.volume_down),
                 contentDescription = "Volumen Bajo",
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.width(8.dp))
             Slider(
@@ -62,34 +68,54 @@ fun VolumeControl(
                     onVolumeChanged(newVolume)
                 },
                 valueRange = 0f..1f,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.Gray,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             )
             Spacer(modifier = Modifier.width(8.dp))
             Icon(
                 painter = painterResource(id = R.mipmap.volume),
                 contentDescription = "Volumen Alto",
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.onSurface
             )
         }
-        Text("Volumen: ${(currentVolume * 100).toInt()}%")
+        Text(
+            "Volumen: ${(currentVolume * 100).toInt()}%",
+            color = MaterialTheme.colorScheme.onBackground
+        )
 
         // Sección de Dispositivos
-        Text("Dispositivos", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Dispositivos",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
         if (availableBluetoothDevices.isNotEmpty()) {
             // Mostrar dispositivos Bluetooth como lista
             Column(horizontalAlignment = Alignment.Start) {
                 availableBluetoothDevices.forEach { deviceName ->
                     Button(
                         onClick = { onBluetoothDeviceSelected(deviceName) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary
+                        )
                     ) {
                         Text(deviceName)
                     }
-                    Spacer(modifier = Modifier.height(8.dp)) // Espacio entre botones
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         } else {
-            Text("No hay dispositivos conectados en este momento")
+            Text(
+                "No hay dispositivos conectados en este momento",
+                color = MaterialTheme.colorScheme.onBackground
+            )
         }
     }
 }

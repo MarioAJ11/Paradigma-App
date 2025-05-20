@@ -1,7 +1,6 @@
 package com.example.paradigmaapp.android.audio;
 
 import androidx.compose.foundation.Canvas;
-import androidx.compose.foundation.Image;
 import androidx.compose.foundation.background;
 import androidx.compose.foundation.clickable;
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures;
@@ -11,23 +10,23 @@ import androidx.compose.material3.*;
 import androidx.compose.runtime.*;
 import androidx.compose.ui.Alignment;
 import androidx.compose.ui.Modifier;
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset;
-import androidx.compose.ui.graphics.Color;
 import androidx.compose.ui.input.pointer.pointerInput;
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource;
 import androidx.compose.ui.unit.dp;
-import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.common.Player
+import coil.compose.AsyncImage
 import com.example.paradigmaapp.android.R;
 
 /**
- * <p>Composable que representa la interfaz de un reproductor de audio compacto.</p>
- *
- * <p>Este componente muestra información básica sobre la reproducción actual (título del podcast/streaming,
+ * Composable que representa la interfaz de un reproductor de audio compacto.
+ * Este componente muestra información básica sobre la reproducción actual (título del podcast/streaming,
  * imagen opcional) y proporciona controles esenciales como reproducir/pausar, control de volumen
- * y un botón para iniciar/detener la reproducción del streaming en vivo.</p>
- *
- * <p>También incluye una barra de progreso interactiva que permite al usuario navegar a diferentes
- * puntos de la reproducción (solo para contenido no en vivo).</p>
+ * y un botón para iniciar/detener la reproducción del streaming en vivo.
+ * También incluye una barra de progreso interactiva que permite al usuario navegar a diferentes
+ * puntos de la reproducción (solo para contenido no en vivo).
  *
  * @param player El {@link ExoPlayer} asociado para controlar la reproducción. Puede ser nulo.
  * @param isPlaying Estado booleano que indica si el audio se está reproduciendo actualmente.
@@ -49,19 +48,19 @@ import com.example.paradigmaapp.android.R;
  */
 @Composable
 fun AudioPlayer(
-    player: ExoPlayer?,
+    player: Player?,
     isPlaying: Boolean,
     onPlayPauseClick: () -> Unit,
     progress: Float,
     onProgressChange: (Float) -> Unit,
-    isLiveStream: Boolean = false,
-    modifier: Modifier = Modifier,
-    podcastTitle: String? = null,
-    podcastImage: Int? = null,
-    isAndainaPlaying: Boolean = false,
-    onPlayStreamingClick: () -> Unit = {},
-    onPodcastInfoClick: () -> Unit = {},
-    onVolumeIconClick: () -> Unit = {}
+    isLiveStream: Boolean,
+    podcastTitle: String?,
+    podcastImage: String?,
+    isAndainaPlaying: Boolean,
+    onPlayStreamingClick: () -> Unit,
+    onPodcastInfoClick: () -> Unit,
+    onVolumeIconClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     /**
      * Estado local para mantener el volumen actual del reproductor.
@@ -74,7 +73,7 @@ fun AudioPlayer(
     /**
      * Estado local para almacenar la posición del círculo de progreso durante el arrastre.
      */
-    var progressCirclePosition by remember { mutableStateOf(0f) }
+    var progressCirclePosition by remember { mutableFloatStateOf(0f) }
 
     /**
      * Efecto lanzado cuando cambia el volumen del reproductor externo para actualizar el estado local.
@@ -82,6 +81,12 @@ fun AudioPlayer(
     LaunchedEffect(player?.volume) {
         currentVolume = player?.volume ?: 0f
     }
+
+    // <-- Nuevo: Obtén los colores del tema fuera del bloque Canvas
+    val progressColor = MaterialTheme.colorScheme.secondary
+    val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
+    val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
+
 
     Card(
         modifier = modifier
@@ -107,24 +112,33 @@ fun AudioPlayer(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .weight(1f, fill = false)
+                        .clip(RoundedCornerShape(8.dp))
                         .clickable(enabled = podcastImage != null || !podcastTitle.isNullOrEmpty()) {
                             onPodcastInfoClick()
                         }
                 ) {
                     if (podcastImage != null) {
-                        Image(
-                            painter = painterResource(id = podcastImage),
-                            contentDescription = podcastTitle ?: "Imagen del podcast",
-                            modifier = Modifier.size(40.dp)
+                        // Si podcastImage es una URL de String
+                        AsyncImage(
+                            model = podcastImage, // Aquí se pasaría la URL
+                            contentDescription = "Podcast Cover",
+                            modifier = Modifier
+                                .size(64.dp) // O el tamaño que necesites
+                                .clip(RoundedCornerShape(4.dp)), // Para esquinas redondeadas
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(R.mipmap.imagen),
+                            placeholder = painterResource(R.mipmap.imagen) // Imagen de placeholder mientras carga
                         )
                         Text(
                             text = podcastTitle ?: "Sin streaming en directo",
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = onPrimaryColor
                         )
                     } else {
                         Text(
                             text = if (!podcastTitle.isNullOrEmpty()) "Streaming en vivo: $podcastTitle" else "Sin streaming en directo",
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = onPrimaryColor
                         )
                     }
                 }
@@ -138,14 +152,16 @@ fun AudioPlayer(
                         Icon(
                             painter = painterResource(id = if (isPlaying) R.mipmap.pause else R.mipmap.play),
                             contentDescription = if (isPlaying) "Pause" else "Play",
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(32.dp),
+                            tint = onPrimaryColor
                         )
                     }
                     IconButton(onClick = { onVolumeIconClick() }) {
                         Icon(
                             painter = painterResource(id = R.mipmap.volume),
                             contentDescription = "Control de Volumen",
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(32.dp),
+                            tint = onPrimaryColor
                         )
                     }
                     // Botón de PlayStreaming
@@ -153,7 +169,8 @@ fun AudioPlayer(
                         Icon(
                             painter = painterResource(id = R.mipmap.streaming),
                             contentDescription = if (isAndainaPlaying) "Detener Streaming" else "Iniciar Streaming",
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(32.dp),
+                            tint = onPrimaryColor
                         )
                     }
                 }
@@ -164,7 +181,7 @@ fun AudioPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(4.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(surfaceVariantColor)
                     .pointerInput(Unit) {
                         detectHorizontalDragGestures(
                             onDragStart = { offset ->
@@ -188,7 +205,6 @@ fun AudioPlayer(
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val progressWidth = size.width * progress
-                    val progressColor = Color(0xFFD4CFCF)
                     drawLine(
                         color = progressColor,
                         start = Offset(0f, center.y),
