@@ -24,11 +24,13 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Player.STATE_READY // <-- ¡Asegúrate de tener esta importación!
 import androidx.media3.exoplayer.ExoPlayer
 import com.example.paradigmaapp.android.api.AndainaStream
 import com.example.paradigmaapp.android.api.ArchiveService
@@ -49,6 +51,14 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.focus.onFocusChanged
+import com.example.paradigmaapp.android.navigation.BottomNavigationBar
+import com.example.paradigmaapp.android.screens.DownloadedPodcastScreen
+import com.example.paradigmaapp.android.screens.OnGoingPodcastScreen
+import com.example.paradigmaapp.android.screens.QueueScreen
+import com.example.paradigmaapp.android.viewmodel.DownloadedPodcastViewModel
+import com.example.paradigmaapp.android.viewmodel.OnGoingPodcastViewModel
+import com.example.paradigmaapp.android.viewmodel.QueueViewModel
+
 
 /**
  * Constantes para SharedPreferences utilizadas en la aplicación.
@@ -57,6 +67,11 @@ private const val PREFS_NAME = "PodcastPlaybackPrefs"
 private const val PREF_CURRENT_PODCAST_URL = "currentPodcastUrl"
 private const val PREF_IS_STREAM_ACTIVE = "isStreamActive"
 private const val PREF_PODCAST_POSITIONS = "podcastPositions"
+// Constante para guardar la cola de reproducción
+private const val PREF_PODCAST_QUEUE = "podcastQueue"
+// Constante para guardar los podcasts descargados
+private const val PREF_DOWNLOADED_PODCASTS = "downloadedPodcasts"
+
 
 /**
  * Obtiene la instancia de [SharedPreferences] con el nombre específico para la aplicación.
@@ -75,7 +90,7 @@ fun getSharedPreferences(context: Context): SharedPreferences {
  *
  * @param context El contexto de la aplicación.
  * @param podcastUrl La URL del podcast del que se guarda la posición.
- * @param positionMillis La posición de reproducción en milisegegundos.
+ * @param positionMillis La posición de reproducción en milisegundos.
  */
 fun savePodcastPosition(context: Context, podcastUrl: String, positionMillis: Long) {
     val prefs = getSharedPreferences(context)
@@ -157,6 +172,55 @@ fun loadIsStreamActive(context: Context): Boolean {
 }
 
 /**
+ * Guarda la cola de reproducción de podcasts en SharedPreferences.
+ *
+ * @param context El contexto de la aplicación.
+ * @param queue La lista de URLs de podcasts en la cola.
+ */
+fun savePodcastQueue(context: Context, queue: List<String>) {
+    getSharedPreferences(context).edit().apply {
+        putStringSet(PREF_PODCAST_QUEUE, queue.toSet())
+        apply()
+    }
+    Timber.d("Saved podcast queue: $queue")
+}
+
+/**
+ * Carga la cola de reproducción de podcasts desde SharedPreferences.
+ *
+ * @param context El contexto de la aplicación.
+ * @return La lista de URLs de podcasts en la cola.
+ */
+fun loadPodcastQueue(context: Context): List<String> {
+    return getSharedPreferences(context).getStringSet(PREF_PODCAST_QUEUE, emptySet())?.toList() ?: emptyList()
+}
+
+/**
+ * Guarda los identificadores de los podcasts descargados en SharedPreferences.
+ *
+ * @param context El contexto de la aplicación.
+ * @param downloadedIdentifiers La lista de identificadores de podcasts descargados.
+ */
+fun saveDownloadedPodcastIdentifiers(context: Context, downloadedIdentifiers: List<String>) {
+    getSharedPreferences(context).edit().apply {
+        putStringSet(PREF_DOWNLOADED_PODCASTS, downloadedIdentifiers.toSet())
+        apply()
+    }
+    Timber.d("Saved downloaded podcast identifiers: $downloadedIdentifiers")
+}
+
+/**
+ * Carga los identificadores de los podcasts descargados desde SharedPreferences.
+ *
+ * @param context El contexto de la aplicación.
+ * @return La lista de identificadores de podcasts descargados.
+ */
+fun loadDownloadedPodcastIdentifiers(context: Context): List<String> {
+    return getSharedPreferences(context).getStringSet(PREF_DOWNLOADED_PODCASTS, emptySet())?.toList() ?: emptyList()
+}
+
+
+/**
  * [Composable] principal de la aplicación que muestra la lista de podcasts,
  * controles de reproducción y ajustes.
  *
@@ -173,6 +237,16 @@ fun AppScreen() {
     val context = LocalContext.current
     val archiveService = remember { ArchiveService() }
     val andainaStreamPlayer = remember(context) { AndainaStream(context) }
+
+    // ViewModels para las nuevas pantallas
+    // Se pasa una lambda adaptada a getPodcastPosition para que el ViewModel solo reciba la URL
+    val onGoingPodcastViewModel = remember {
+        OnGoingPodcastViewModel { podcastUrl ->
+            getPodcastPosition(context, podcastUrl)
+        }
+    }
+    val downloadedPodcastViewModel = remember { DownloadedPodcastViewModel(context, archiveService) }
+    val queueViewModel = remember { QueueViewModel(context) } // Inicializar con contexto
 
     // Estados de la UI y datos
     var initialPodcasts by remember { mutableStateOf<List<Podcast>>(emptyList()) }
@@ -192,11 +266,14 @@ fun AppScreen() {
     var isAndainaPlaying by remember { mutableStateOf(false) }
     var hasStreamLoadFailed by remember { mutableStateOf(false) }
 
-    // Estado para controlar la búsqueda de podcasts
-    var seekJob by remember { mutableStateOf<Job?>(null) }
+    // Estado para controlar la búsqueda de podcasts (originalmente seekJob, se renombró o se puede eliminar si no se usa)
+    var searchJob by remember { mutableStateOf<Job?>(null) } // Renombrado de seekJob para claridad
 
-    // Estado para mostrar el diálogo de ajustes
+    // Estados para controlar la visibilidad de las nuevas pantallas
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showOnGoingPodcastsScreen by remember { mutableStateOf(false) }
+    var showDownloadedPodcastsScreen by remember { mutableStateOf(false) }
+    var showQueueScreen by remember { mutableStateOf(false) }
 
     // Estado para el foco del buscador
     val searchBarFocusRequester = remember { FocusRequester() }
@@ -269,11 +346,31 @@ fun AppScreen() {
                         when (playbackState) {
                             Player.STATE_ENDED -> {
                                 currentPodcast?.let { podcast ->
-                                    savePodcastPosition(
-                                        context,
-                                        podcast.url,
-                                        0L
-                                    ) // Reiniciar la posición guardada al finalizar.
+                                    // Cuando un podcast termina, guardar su posición en 0L para permitir la reproducción de nuevo
+                                    savePodcastPosition(context, podcast.url, 0L)
+
+                                    // Intentar reproducir el siguiente podcast de la cola
+                                    coroutineScope.launch {
+                                        val nextPodcast = queueViewModel.dequeuePodcast(podcast.url)
+                                        if (nextPodcast != null) {
+                                            Timber.d("Playing next podcast from queue: ${nextPodcast.title}")
+                                            currentPodcast = nextPodcast // Esto disparará el LaunchedEffect(currentPodcast)
+                                        } else {
+                                            Timber.d("Queue is empty. Stopping playback and keeping current podcast selected.")
+                                            // Si no hay más podcasts en cola, no deseleccionar el podcast actual.
+                                            // Esto permite que el usuario lo reproduzca de nuevo si lo desea.
+                                        }
+                                    }
+                                }
+                            }
+                            // Si el reproductor está en estado READY y NO está reproduciendo, se considera pausado.
+                            // Esto cubre el escenario de haber pausado manualmente.
+                            Player.STATE_READY -> {
+                                if (!isPlaying) { // !isPlaying significa que playWhenReady es false
+                                    currentPodcast?.let { podcast ->
+                                        savePodcastPosition(context, podcast.url, currentPosition)
+                                        onGoingPodcastViewModel.updatePodcastProgress(podcast.url, currentPosition, duration)
+                                    }
                                 }
                             }
                         }
@@ -281,7 +378,8 @@ fun AppScreen() {
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         isPodcastPlaying = isPlaying
-                        if (!isPlaying) {
+                        // Guardar la posición cuando se pausa, no solo cuando termina.
+                        if (!isPlaying) { // Si ya no está reproduciendo, podría ser por pausa o por fin de reproducción.
                             currentPodcast?.let { podcast ->
                                 savePodcastPosition(context, podcast.url, currentPosition)
                             }
@@ -320,20 +418,20 @@ fun AppScreen() {
                 initialPodcasts = allPodcasts
                 isLoadingInitial = false
 
+                // Inicializar ViewModels con la lista de podcasts
+                onGoingPodcastViewModel.setAllPodcasts(allPodcasts)
+                downloadedPodcastViewModel.setAllPodcasts(allPodcasts)
+                queueViewModel.setAllPodcasts(allPodcasts) // Pasa la lista de todos los podcasts
+
                 // Cargar el podcast actualmente guardado y su posición.
                 val savedPodcastUrl = loadCurrentPodcast(context)
                 Timber.d("Loaded saved podcast URL: $savedPodcastUrl")
                 if (savedPodcastUrl != null) {
                     currentPodcast = allPodcasts.find { it.url == savedPodcastUrl }
                     Timber.d("Found podcast in list: ${currentPodcast?.title}")
-                    currentPodcast?.let { podcast ->
-                        val savedPosition = getPodcastPosition(context, podcast.url)
-                        podcastExoPlayer.clearMediaItems()
-                        podcastExoPlayer.setMediaItem(MediaItem.fromUri(podcast.url), savedPosition)
-                        podcastExoPlayer.prepare()
-                        podcastExoPlayer.play()
-                        Timber.d("Attempting to play saved podcast: ${podcast.title}")
-                    }
+                    // El LaunchedEffect(currentPodcast) se encargará de cargarlo y reproducirlo.
+                    // Si no está en cola y solo se restauró el último, se reproducirá
+                    // desde la posición guardada.
                 }
             } catch (e: Exception) {
                 Timber.e("Error loading podcasts: $e")
@@ -359,6 +457,11 @@ fun AppScreen() {
                 podcastDuration = if (duration > 0 && duration != C.TIME_UNSET) duration else 0L
                 podcastProgress =
                     if (podcastDuration > 0) currentPos.toFloat() / podcastDuration.toFloat() else 0f
+
+                // Actualizar la posición de reproducción en el ViewModel de "Seguir Viendo"
+                if (isPodcastPlaying || podcastExoPlayer.playbackState == Player.STATE_READY) { // Verificar si está reproduciendo O pausado (STATE_READY y no isPlaying)
+                    onGoingPodcastViewModel.updatePodcastProgress(currentPodcast!!.url, currentPos, podcastDuration)
+                }
             } else {
                 podcastProgress = 0f
                 podcastDuration = 0L
@@ -392,7 +495,7 @@ fun AppScreen() {
             // Detener y limpiar el reproductor de podcasts al deseleccionar.
             podcastExoPlayer.stop()
             podcastExoPlayer.clearMediaItems()
-            saveCurrentPodcast(context, null)
+            saveCurrentPodcast(context, null) // Guardar que no hay podcast actual.
 
             // Iniciar el stream si está activo y no ha fallado la carga.
             if (isAndainaStreamActive && !hasStreamLoadFailed) {
@@ -485,8 +588,38 @@ fun AppScreen() {
                 )
             }
 
-            // Lista de podcasts.
+            // Contenido principal de la pantalla
             when {
+                showOnGoingPodcastsScreen -> {
+                    OnGoingPodcastScreen(
+                        onGoingPodcastViewModel = onGoingPodcastViewModel,
+                        onPodcastSelected = { podcast ->
+                            currentPodcast = podcast
+                            showOnGoingPodcastsScreen = false // Regresar a la pantalla principal
+                        },
+                        onBackClick = { showOnGoingPodcastsScreen = false }
+                    )
+                }
+                showDownloadedPodcastsScreen -> {
+                    DownloadedPodcastScreen(
+                        downloadedPodcastViewModel = downloadedPodcastViewModel,
+                        onPodcastSelected = { podcast ->
+                            currentPodcast = podcast
+                            showDownloadedPodcastsScreen = false // Regresar a la pantalla principal
+                        },
+                        onBackClick = { showDownloadedPodcastsScreen = false }
+                    )
+                }
+                showQueueScreen -> {
+                    QueueScreen(
+                        queueViewModel = queueViewModel,
+                        onPodcastSelected = { podcast ->
+                            currentPodcast = podcast
+                            showQueueScreen = false // Regresar a la pantalla principal
+                        },
+                        onBackClick = { showQueueScreen = false }
+                    )
+                }
                 isLoadingInitial -> {
                     // Muestra un indicador de carga mientras se obtienen los podcasts iniciales.
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -515,27 +648,56 @@ fun AppScreen() {
                         podcasts = filteredPodcasts,
                         onPodcastSelected = { podcast ->
                             // Lógica al hacer clic en un podcast de la lista.
+                            // Si se selecciona el mismo podcast:
                             if (currentPodcast?.url == podcast.url) {
-                                // Si el podcast ya está seleccionado
-                                if (podcastExoPlayer.playbackState == Player.STATE_ENDED) {
-                                    // y la reproducción ha finalizado, reinicia la reproducción.
-                                    podcastExoPlayer.seekTo(0L)
-                                    podcastExoPlayer.play()
+                                if (isPodcastPlaying) {
+                                    // Si ya está reproduciéndose, pausarlo
+                                    podcastExoPlayer.pause()
                                 } else {
-                                    // si está reproduciéndose o pausado, deselecciónalo.
-                                    currentPodcast = null
+                                    // Si está pausado (STATE_READY y !isPlaying) o al final, reanudarlo o reiniciarlo
+                                    if (podcastExoPlayer.playbackState == Player.STATE_ENDED || podcastExoPlayer.currentPosition == 0L) {
+                                        podcastExoPlayer.seekTo(0L) // Reiniciar si ha terminado o está al principio
+                                        podcastExoPlayer.play()
+                                    } else if (podcastExoPlayer.playbackState == Player.STATE_READY) { // Si está en pausa
+                                        podcastExoPlayer.play() // Reanudar
+                                    }
                                 }
                             } else {
                                 // Si se selecciona un podcast diferente, establece este como el podcast actual.
-                                currentPodcast = podcast
+                                currentPodcast = podcast // Esto disparará el LaunchedEffect(currentPodcast) para cargarlo y reproducirlo
                             }
                         },
+                        onAddToQueue = { podcast ->
+                            queueViewModel.addPodcastToQueue(podcast)
+                            Timber.d("Podcast ${podcast.title} añadido a la cola.")
+                        },
+                        onRemoveFromQueue = { podcast ->
+                            queueViewModel.removePodcastFromQueue(podcast)
+                            Timber.d("Podcast ${podcast.title} eliminado de la cola.")
+                        },
+                        // onDownloadPodcast ahora debe aceptar dos parámetros: el podcast y el callback para el mensaje
+                        onDownloadPodcast = { podcast, onMessageReady ->
+                            downloadedPodcastViewModel.downloadPodcast(podcast) { message ->
+                                // Mostrar un Snackbar o Toast con el mensaje
+                                coroutineScope.launch {
+                                    scaffoldState.snackbarHostState.showSnackbar(message)
+                                }
+                                // No es necesario invocar onMessageReady si ya manejamos el mensaje aquí con Snackbar
+                            }
+                        },
+                        onDeleteDownload = { podcast ->
+                            downloadedPodcastViewModel.deleteDownloadedPodcast(podcast)
+                        },
+                        // Pasar las listas de podcasts descargados y en cola para saber el estado
+                        downloadedPodcastIdentifiers = downloadedPodcastViewModel.downloadedPodcastIdentifiers.collectAsState().value,
+                        queuePodcastUrls = queueViewModel.queuePodcastUrls.collectAsState().value,
                         modifier = Modifier.weight(1f) // Permite que la lista ocupe el espacio restante.
                     )
                 }
             }
 
             // Controles de reproducción de audio, mostrados en la parte inferior.
+            // Pasa el título y la imagen del podcast actual al AudioPlayer.
             AudioPlayer(
                 player = if (currentPodcast != null) podcastExoPlayer else andainaStreamPlayer.exoPlayer,
                 isPlaying = if (currentPodcast != null) isPodcastPlaying else isAndainaPlaying,
@@ -548,6 +710,7 @@ fun AppScreen() {
                             podcastExoPlayer.play()
                         }
                     } else {
+                        // Si no hay podcast seleccionado, controla el stream de Andaina
                         if (isAndainaStreamActive) {
                             if (isAndainaPlaying) {
                                 andainaStreamPlayer.pause()
@@ -557,99 +720,81 @@ fun AppScreen() {
                         }
                     }
                 },
-                progress = podcastProgress,
+                progress = podcastProgress, // Progreso del podcast
                 onProgressChange = { newProgress ->
-                    // Permite al usuario cambiar la posición de reproducción del podcast.
-                    if (currentPodcast != null && podcastDuration > 0) {
-                        seekJob?.cancel() // Cancela cualquier trabajo de búsqueda pendiente.
-                        seekJob = coroutineScope.launch {
-                            delay(100) // Pequeño delay para evitar saltos excesivos.
-                            val newPosition = (newProgress * podcastDuration).toLong()
-                            podcastExoPlayer.seekTo(newPosition)
-                            savePodcastPosition(context, currentPodcast!!.url, newPosition) // Guarda la nueva posición.
-                        }
-                    }
+                    // Buscar en el reproductor de podcasts
+                    val seekPosition = (newProgress * podcastDuration).toLong()
+                    podcastExoPlayer.seekTo(seekPosition)
                 },
-                isLiveStream = currentPodcast == null, // Indica si se está reproduciendo un stream en vivo.
-                podcastTitle = currentPodcast?.title,
-                podcastImage = currentPodcast?.imageUrl,
+                isLiveStream = currentPodcast == null, // Considera en vivo si no hay podcast seleccionado
+                podcastTitle = currentPodcast?.title, // Pasa el título del podcast
+                podcastImage = currentPodcast?.imageUrl, // Pasa la URL de la imagen del podcast
                 isAndainaPlaying = isAndainaPlaying,
                 onPlayStreamingClick = {
-                    // Controla la reproducción del stream de Andaina cuando no hay un podcast seleccionado.
-                    if (currentPodcast == null) {
-                        if (isAndainaPlaying) {
-                            andainaStreamPlayer.pause()
-                        } else {
-                            if (isAndainaStreamActive) {
-                                andainaStreamPlayer.play()
-                            }
-                        }
-                    } else {
-                        // Si hay un podcast seleccionado, al hacer clic se detiene y se puede iniciar el stream.
-                        savePodcastPosition(context, currentPodcast!!.url, podcastExoPlayer.currentPosition)
-                        currentPodcast = null // Deselecciona el podcast para permitir la reproducción del stream.
+                    // Alternar el estado del stream de Andaina
+                    isAndainaStreamActive = !isAndainaStreamActive
+                    if (isAndainaStreamActive) {
+                        // Si se activa el stream, detener cualquier podcast en reproducción
+                        currentPodcast = null
                     }
                 },
-                onPodcastInfoClick = {
-                    // TODO: Implementar la lógica para mostrar información adicional del podcast.
-                    currentPodcast?.let {
-                        if (!podcastExoPlayer.isPlaying) { // Evita llamadas redundantes si ya está reproduciendo.
-                            podcastExoPlayer.play()
-                        }
-                    }
-                },
+                onPodcastInfoClick = { /* No hay una acción específica aquí aún, se podría abrir una pantalla de detalles del podcast */ },
                 onVolumeIconClick = {
-                    // Muestra el BottomSheet con el control de volumen.
                     coroutineScope.launch {
-                        scaffoldState.bottomSheetState.expand()
+                        if (scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded) {
+                            scaffoldState.bottomSheetState.hide()
+                        } else {
+                            scaffoldState.bottomSheetState.expand()
+                        }
                     }
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth() // Ocupa todo el ancho disponible.
             )
-
-            // Menú de navegación inferior con los iconos solicitados.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface) // Fondo para el menú de navegación inferior
-                    .padding(top = 8.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { /* TODO: Implementar "Seguir Viendo" */ }) {
-                    Icon(
-                        Icons.Filled.PlayArrow,
-                        contentDescription = "Seguir Viendo",
-                        tint = MaterialTheme.colorScheme.onSurface // Color del icono
-                    )
-                }
-                IconButton(onClick = { /* TODO: Implementar "Descargas" */ }) {
-                    Icon(
-                        Icons.Filled.Download,
-                        contentDescription = "Descargas",
-                        tint = MaterialTheme.colorScheme.onSurface // Color del icono
-                    )
-                }
-                IconButton(onClick = { /* TODO: Implementar "Cola" */ }) {
-                    Icon(
-                        Icons.Filled.List,
-                        contentDescription = "Cola",
-                        tint = MaterialTheme.colorScheme.onSurface // Color del icono
-                    )
-                }
-                IconButton(onClick = { showSettingsDialog = true }) {
-                    Icon(Icons.Filled.Settings, contentDescription = "Ajustes")
-                }
-            }
+            // Barra de navegación inferior
+            BottomNavigationBar(
+                onSearchClick = {
+                    searchJob?.cancel() // Cancela cualquier búsqueda anterior si hay
+                    coroutineScope.launch {
+                        delay(100) // Pequeño delay para que la UI se asiente
+                        searchBarFocusRequester.requestFocus()
+                        searchText = "" // Limpiar el texto de búsqueda al ir a la pantalla principal
+                        showOnGoingPodcastsScreen = false
+                        showDownloadedPodcastsScreen = false
+                        showQueueScreen = false
+                    }
+                },
+                onOnGoingClick = {
+                    showOnGoingPodcastsScreen = true
+                    showDownloadedPodcastsScreen = false
+                    showQueueScreen = false
+                    searchBarFocusRequester.freeFocus() // Liberar foco del buscador
+                },
+                onDownloadedClick = {
+                    showDownloadedPodcastsScreen = true
+                    showOnGoingPodcastsScreen = false
+                    showQueueScreen = false
+                    searchBarFocusRequester.freeFocus() // Liberar foco del buscador
+                },
+                onQueueClick = {
+                    showQueueScreen = true
+                    showOnGoingPodcastsScreen = false
+                    showDownloadedPodcastsScreen = false
+                    searchBarFocusRequester.freeFocus() // Liberar foco del buscador
+                },
+                onSettingsClick = { showSettingsDialog = true }
+            )
         }
+    }
 
-        // Diálogo de ajustes, mostrado condicionalmente.
+    // Dialogo de ajustes
+    if (showSettingsDialog) {
         if (showSettingsDialog) {
             SettingsScreen(
                 onDismissRequest = { showSettingsDialog = false },
                 isStreamActive = isAndainaStreamActive,
-                onStreamActiveChanged = { isActive ->
-                    isAndainaStreamActive = isActive
+                onStreamActiveChanged = { newIsActive ->
+                    isAndainaStreamActive = newIsActive
+                    showSettingsDialog = false
                 }
             )
         }

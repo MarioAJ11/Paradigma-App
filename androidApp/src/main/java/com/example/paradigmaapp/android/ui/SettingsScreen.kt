@@ -31,14 +31,9 @@ fun SettingsScreen(
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        // Colores del AlertDialog:
-        // containerColor usa MaterialTheme.colorScheme.surface por defecto
-        // titleContentColor y textContentColor usan MaterialTheme.colorScheme.onSurface por defecto
-        // confirmButtonContentColor y dismissButtonContentColor usan MaterialTheme.colorScheme.primary por defecto
-        // Puedes anularlos aquí si quieres un control explícito:
-        // containerColor = MaterialTheme.colorScheme.surface,
-        // titleContentColor = MaterialTheme.colorScheme.onSurface,
-        // textContentColor = MaterialTheme.colorScheme.onSurface,
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
         title = {
             // El color del texto del título por defecto será MaterialTheme.colorScheme.onSurface
             Text(text = "Ajustes")

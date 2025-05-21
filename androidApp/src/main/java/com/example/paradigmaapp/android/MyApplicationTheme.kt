@@ -4,13 +4,19 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
-import androidx.compose.material3.Typography // Importa Typography
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle // Importa TextStyle
-import androidx.compose.ui.text.font.FontFamily // Importa FontFamily
-import androidx.compose.ui.text.font.FontWeight // Importa FontWeight
-import androidx.compose.ui.unit.sp // Importa sp para tamaños de fuente
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+
+val BlancoPuro = Color(0xFFFFFFFF)
+val AmarilloRadio = Color(0xFFF4CF31)
+val NegroFondo = Color(0xFF000000)
+val GrisTextoOscuro = Color(0xFF616161)
+val Otros = Color(0xFFFCF3CB) // Ver donde poner
 
 /**
  * Define el esquema de colores para el tema oscuro.
@@ -23,15 +29,16 @@ import androidx.compose.ui.unit.sp // Importa sp para tamaños de fuente
  * - onBackground: Color del texto/iconos sobre el color de fondo.
  * - onSurface: Color del texto/iconos sobre el color de la superficie.
  */
+
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFFD700), // Amarillo oro
-    secondary = Color(0xFF6C6868), // Gris medio
-    background = Color.Black, // Fondo negro
-    surface = Color.Black,
-    onPrimary = Color.Black,
-    onSecondary = Color.Black,
-    onBackground = Color.White,
-    onSurface = Color.White
+    primary = AmarilloRadio,
+    secondary = GrisTextoOscuro,
+    background = NegroFondo,
+    surface = NegroFondo,
+    onPrimary = NegroFondo, // El texto sobre amarillo puede ser negro
+    onSecondary = BlancoPuro,
+    onBackground = BlancoPuro,
+    onSurface = Otros
 )
 
 /**
@@ -46,14 +53,14 @@ private val DarkColorScheme = darkColorScheme(
  * - onSurface: Color del texto/iconos sobre el color de la superficie.
  */
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFFFFD700), // Amarillo oro
-    secondary = Color(0xFF6C6868), // Gris medio
-    background = Color.White, // Fondo blanco
-    surface = Color.White,
-    onPrimary = Color.Black,
-    onSecondary = Color.Black,
-    onBackground = Color.Black,
-    onSurface = Color.Black
+    primary = AmarilloRadio,
+    secondary = GrisTextoOscuro,
+    background = BlancoPuro,
+    surface = BlancoPuro,
+    onPrimary = NegroFondo,
+    onSecondary = NegroFondo,
+    onBackground = NegroFondo,
+    onSurface = NegroFondo
 )
 
 /**
@@ -193,6 +200,5 @@ fun MyApplicationTheme(
         colorScheme = colorScheme, // Esquema de colores a aplicar.
         typography = AppTypography, // <--- Aquí se añade la tipografía personalizada.
         content = content // Contenido al que se aplica el tema.
-        // TODO: Añadir formas personalizadas (ShapeScheme) si es necesario.
     )
 }

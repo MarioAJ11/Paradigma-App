@@ -22,17 +22,31 @@ import androidx.compose.ui.unit.dp
 fun PodcastList(
     podcasts: List<Podcast>,
     onPodcastSelected: (Podcast) -> Unit,
+    onAddToQueue: (Podcast) -> Unit,
+    onRemoveFromQueue: (Podcast) -> Unit,
+    onDownloadPodcast: (Podcast, (String) -> Unit) -> Unit,
+    onDeleteDownload: (Podcast) -> Unit,
+    downloadedPodcastIdentifiers: List<String>,
+    queuePodcastUrls: List<String>,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
-        modifier = modifier // Usa el modificador que recibe la función
-            .fillMaxWidth(), // Combina el modificador pasado con fillMaxWidth()
-        contentPadding = PaddingValues(vertical = 8.dp) // Añade un padding vertical a la lista.
+        modifier = modifier,
+        contentPadding = PaddingValues(vertical = 8.dp)
     ) {
-        // Utiliza la función 'items' para iterar eficientemente sobre la lista de podcasts.
         items(podcasts) { podcast ->
-            // Para cada podcast, renderiza el composable [PodcastListItem].
-            PodcastListItem(podcast = podcast, onPodcastSelected = onPodcastSelected)
+            PodcastListItem(
+                podcast = podcast,
+                onPodcastSelected = onPodcastSelected,
+                onAddToQueue = onAddToQueue,
+                onRemoveFromQueue = onRemoveFromQueue,
+                onDownloadPodcast = onDownloadPodcast,
+                onDeleteDownload = onDeleteDownload,
+                isDownloaded = downloadedPodcastIdentifiers.contains(podcast.identifier),
+                isInQueue = queuePodcastUrls.contains(podcast.url),
+                downloadedPodcastIdentifiers = downloadedPodcastIdentifiers,
+                queuePodcastUrls = queuePodcastUrls
+            )
         }
     }
 }

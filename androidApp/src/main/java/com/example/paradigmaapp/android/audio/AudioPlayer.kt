@@ -82,7 +82,6 @@ fun AudioPlayer(
         currentVolume = player?.volume ?: 0f
     }
 
-    // <-- Nuevo: Obtén los colores del tema fuera del bloque Canvas
     val progressColor = MaterialTheme.colorScheme.secondary
     val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
     val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
@@ -117,30 +116,26 @@ fun AudioPlayer(
                             onPodcastInfoClick()
                         }
                 ) {
-                    if (podcastImage != null) {
-                        // Si podcastImage es una URL de String
+                    // Muestra la imagen si está disponible
+                    if (podcastImage != null && podcastImage.isNotEmpty()) {
                         AsyncImage(
-                            model = podcastImage, // Aquí se pasaría la URL
+                            model = podcastImage,
                             contentDescription = "Podcast Cover",
                             modifier = Modifier
-                                .size(64.dp) // O el tamaño que necesites
-                                .clip(RoundedCornerShape(4.dp)), // Para esquinas redondeadas
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(4.dp)),
                             contentScale = ContentScale.Crop,
                             error = painterResource(R.mipmap.imagen),
-                            placeholder = painterResource(R.mipmap.imagen) // Imagen de placeholder mientras carga
-                        )
-                        Text(
-                            text = podcastTitle ?: "Sin streaming en directo",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = onPrimaryColor
-                        )
-                    } else {
-                        Text(
-                            text = if (!podcastTitle.isNullOrEmpty()) "Streaming en vivo: $podcastTitle" else "Sin streaming en directo",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = onPrimaryColor
+                            placeholder = painterResource(R.mipmap.imagen)
                         )
                     }
+
+                    // Muestra el título del podcast o un mensaje de "Sin streaming"
+                    Text(
+                        text = if (!podcastTitle.isNullOrEmpty()) podcastTitle!! else "Sin streaming en directo",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = onPrimaryColor
+                    )
                 }
 
                 // Controles
