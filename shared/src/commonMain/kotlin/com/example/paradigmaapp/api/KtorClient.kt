@@ -28,7 +28,7 @@ val ktorClient = HttpClient(provideHttpClientEngine()) {
 
     // Logging para peticiones y respuestas Ktor.
     install(Logging) {
-        logger = Logger.DEFAULT // Puedes usar un logger más específico si lo deseas.
-        level = LogLevel.INFO // Ajusta el nivel de logging (ALL, HEADERS, BODY, INFO, NONE).
+        logger = Logger.DEFAULT
+        level = LogLevel.ALL
     }
 }

@@ -63,7 +63,6 @@ fun ProgramaScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
     ) {
         TopAppBar(
             title = {

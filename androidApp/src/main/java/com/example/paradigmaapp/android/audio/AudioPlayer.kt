@@ -78,6 +78,7 @@ fun AudioPlayer(
     // Define los colores del tema para usarlos fácilmente.
     val primaryColor = MaterialTheme.colorScheme.primary
     val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
+    val backgroundColor = MaterialTheme.colorScheme.background
     val secondaryColor = MaterialTheme.colorScheme.secondary // Para la barra de progreso
     val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant // Para el fondo de la barra
 
@@ -87,7 +88,7 @@ fun AudioPlayer(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp), // Espaciado del reproductor
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         colors = CardDefaults.cardColors(containerColor = primaryColor),
         shape = RoundedCornerShape(12.dp) // Esquinas un poco más redondeadas
     ) {

@@ -39,7 +39,6 @@ val GrisTextoOriginal = Color(0xFF616161) // Tu GrisTextoOscuro, puede ser un co
 val GrisMuyOscuro = Color(0xFF424242)    // para superficies sutilmente diferenciadas en tema oscuro
 val GrisCasiNegro = Color(0xFF212121)    // para fondos o superficies principales en tema oscuro, alternativa al NegroPuro
 
-// --- Esquemas de Color de Material Design 3 ---
 
 /**
  * Esquema de colores para el Tema Oscuro.

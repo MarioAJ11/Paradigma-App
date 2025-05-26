@@ -15,24 +15,18 @@ import io.ktor.http.*
  */
 class WordpressService {
 
-    private val baseUrl = "https://pruebas.paradigmamedia.org/wp-json/wp/v2"
+    private val baseUrl = "https://pruebas.paradigmamedia.org/wp-json/wp/v2" // Correcto
 
-    /**
-     * Obtiene la lista de todos los programas (términos de la taxonomía 'radio').
-     * @return Una lista de [Programa].
-     * @throws Exception Si ocurre un error durante la petición.
-     */
     suspend fun getProgramas(): List<Programa> {
-        return try {
-            ktorClient.get("$baseUrl/radio") { // 'radio' es el slug de tu taxonomía
-                parameter("per_page", 100) // Obtener hasta 100 programas
-                parameter("_fields", "id,name,slug,description,count") // Campos deseados
-            }.body()
-        } catch (e: Exception) {
-            println("Error fetching programas: ${e.message}")
-            throw e
-        }
+        // LA URL DEBE SER AL ENDPOINT DE TU TAXONOMÍA "radio"
+        return ktorClient.get("$baseUrl/radio") { // Ejemplo: si tu taxonomía se llama "radio"
+            parameter("per_page", 100)
+            parameter("_fields", "id,name,slug,description,count")
+        }.body() // Ktor intentará deserializar la respuesta a List<Programa>
     }
+
+
+
 
     /**
      * Obtiene la lista de episodios para un programa específico.
@@ -63,18 +57,14 @@ class WordpressService {
      * @throws Exception Si ocurre un error durante la petición.
      */
     suspend fun getAllEpisodios(page: Int = 1, perPage: Int = 20): List<Episodio> {
-        return try {
-            ktorClient.get("$baseUrl/episodios") {
-                parameter("page", page)
-                parameter("per_page", perPage)
-                parameter("orderby", "date") // Ordenar por fecha
-                parameter("order", "desc")   // Más recientes primero
-                parameter("_embed", "wp:featuredmedia,wp:term") // Embeber datos relacionados
-            }.body()
-        } catch (e: Exception) {
-            println("Error fetching all episodios (page $page): ${e.message}")
-            throw e
-        }
+        // LA URL DEBE SER AL ENDPOINT DE TU CUSTOM POST TYPE "episodios"
+        return ktorClient.get("$baseUrl/episodios") { // Ejemplo: si tu CPT se llama "episodios"
+            parameter("page", page)
+            parameter("per_page", perPage)
+            parameter("orderby", "date")
+            parameter("order", "desc")
+            parameter("_embed", "wp:featuredmedia,wp:term") // Para incluir imagen y términos de programa
+        }.body() // Ktor intentará deserializar la respuesta a List<Episodio>
     }
 
 

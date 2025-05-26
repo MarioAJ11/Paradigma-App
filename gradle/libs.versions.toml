@@ -72,11 +72,6 @@ androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "androidx-navigation" }
 androidx-navigation-runtime-ktx = { module = "androidx.navigation:navigation-runtime-ktx", version.ref = "androidx-navigation" } # Alternativa a navigation-runtime-android
 
-# Eliminar o no usar estos si androidx-navigation-compose es suficiente:
-# androidx-navigation-runtime-android = { group = "androidx.navigation", name = "navigation-runtime-android", version.ref = "androidx-navigation" }
-# navigation-compose-jvmstubs = { group = "androidx.navigation", name = "navigation-compose-jvmstubs", version.ref = "androidx-navigation" } # Este era el problemático
-
-
 # Media3 (Reproductor de medios)
 androidx-media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "androidx-media3" }
 androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "androidx-media3" }
@@ -89,8 +84,6 @@ coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 # Timber (Logging)
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 
-# Elimina esta línea si no la necesitas o si "compose-material3" ya es suficiente
-# androidx-material3-android = { group = "androidx.compose.material3", name = "material3-android", version.ref = "material3Android" }
 
 
 [plugins]
