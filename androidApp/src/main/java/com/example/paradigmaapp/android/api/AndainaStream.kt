@@ -15,6 +15,8 @@ import io.ktor.client.request.get
 import io.ktor.http.takeFrom
 import io.ktor.http.parameters
 import io.ktor.http.path
+import com.example.paradigmaapp.api.ktorClient
+import com.example.paradigmaapp.model.RadioInfo
 
 /**
  * Clase responsable de gestionar la reproducción del stream de audio de Andaina.

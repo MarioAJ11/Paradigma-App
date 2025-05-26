@@ -1,11 +1,10 @@
 package com.example.paradigmaapp.android.viewmodel
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.paradigmaapp.android.loadPodcastQueue
-import com.example.paradigmaapp.android.podcast.Podcast
-import com.example.paradigmaapp.android.savePodcastQueue
+import com.example.paradigmaapp.android.data.AppPreferences
+import com.example.paradigmaapp.model.Episodio
+import com.example.paradigmaapp.repository.WordpressService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,96 +12,136 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
-class QueueViewModel(private val context: Context) : ViewModel() {
+/**
+ * ViewModel para gestionar la cola de reproducción.
+ *
+ * @property appPreferences Para persistir el estado de la cola.
+ * @property wordpressService Para obtener detalles de los episodios.
+ * @author Mario Alguacil Juárez
+ */
+class QueueViewModel(
+    private val appPreferences: AppPreferences,
+    private val wordpressService: WordpressService
+) : ViewModel() {
 
-    // La cola se almacena como una lista de URLs de podcast
-    private val _queuePodcastUrls = MutableStateFlow<List<String>>(emptyList())
-    val queuePodcastUrls: StateFlow<List<String>> = _queuePodcastUrls.asStateFlow()
+    private val _queueEpisodeIds = MutableStateFlow<List<Int>>(emptyList())
+    val queueEpisodeIds: StateFlow<List<Int>> = _queueEpisodeIds.asStateFlow()
 
-    // Lista de todos los podcasts disponibles (para mapear URLs a objetos Podcast)
-    private val _allPodcasts = mutableListOf<Podcast>()
+    private val _queueEpisodios = MutableStateFlow<List<Episodio>>(emptyList())
+    val queueEpisodios: StateFlow<List<Episodio>> = _queueEpisodios.asStateFlow()
+
+    private var allAvailableEpisodesCache: List<Episodio> = emptyList()
 
     init {
         loadQueueState()
     }
 
-    fun setAllPodcasts(podcasts: List<Podcast>) {
-        _allPodcasts.clear()
-        _allPodcasts.addAll(podcasts)
-        // Después de cargar todos los podcasts, actualiza la lista de objetos de la cola
-        updateQueuePodcastsList()
+    fun setAllAvailableEpisodes(episodes: List<Episodio>) {
+        allAvailableEpisodesCache = episodes
+        // Volver a cargar la lista de objetos de la cola si los episodios base cambian
+        viewModelScope.launch(Dispatchers.IO) {
+            updateQueueEpisodiosListFromIds()
+        }
     }
 
     private fun loadQueueState() {
         viewModelScope.launch(Dispatchers.IO) {
-            _queuePodcastUrls.value = loadPodcastQueue(context)
-            updateQueuePodcastsList()
-            Timber.Forest.d("Loaded podcast queue URLs: ${_queuePodcastUrls.value}")
+            _queueEpisodeIds.value = appPreferences.loadEpisodeQueue()
+            Timber.d("Loaded episode queue IDs: ${_queueEpisodeIds.value}")
+            updateQueueEpisodiosListFromIds()
         }
     }
 
     private fun saveQueueState() {
         viewModelScope.launch(Dispatchers.IO) {
-            savePodcastQueue(context, _queuePodcastUrls.value)
-            Timber.Forest.d("Saved podcast queue URLs: ${_queuePodcastUrls.value}")
+            appPreferences.saveEpisodeQueue(_queueEpisodeIds.value)
+            Timber.d("Saved episode queue IDs: ${_queueEpisodeIds.value}")
         }
     }
 
-    // Mapea las URLs de la cola a objetos Podcast
-    private val _queuePodcasts = MutableStateFlow<List<Podcast>>(emptyList())
-    val queuePodcasts: StateFlow<List<Podcast>> = _queuePodcasts.asStateFlow()
-
-    private fun updateQueuePodcastsList() {
-        val currentQueue = _queuePodcastUrls.value.mapNotNull { url ->
-            _allPodcasts.find { it.url == url }
+    private suspend fun updateQueueEpisodiosListFromIds() {
+        val episodeDetailsList = mutableListOf<Episodio>()
+        for (id in _queueEpisodeIds.value) {
+            val cachedEpisodio = allAvailableEpisodesCache.find { it.id == id }
+            if (cachedEpisodio != null) {
+                episodeDetailsList.add(cachedEpisodio)
+            } else {
+                try {
+                    wordpressService.getEpisodio(id)?.let { fetchedEpisodio ->
+                        episodeDetailsList.add(fetchedEpisodio)
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to fetch details for episode ID $id in queue")
+                }
+            }
         }
-        _queuePodcasts.value = currentQueue
-        Timber.Forest.d("Updated queue podcasts list: ${_queuePodcasts.value.size}")
+        _queueEpisodios.value = episodeDetailsList
+        Timber.d("Updated queue episodios list with ${episodeDetailsList.size} items.")
     }
 
-    fun addPodcastToQueue(podcast: Podcast) {
-        if (!_queuePodcastUrls.value.contains(podcast.url)) {
-            _queuePodcastUrls.value = _queuePodcastUrls.value + podcast.url
+    fun addEpisodeToQueue(episodio: Episodio) {
+        if (!_queueEpisodeIds.value.contains(episodio.id)) {
+            _queueEpisodeIds.value = _queueEpisodeIds.value + episodio.id
             saveQueueState()
-            updateQueuePodcastsList()
-            Timber.Forest.d("Added '${podcast.title}' to queue. Current queue size: ${_queuePodcastUrls.value.size}")
+            // Actualizar la lista de objetos inmediatamente si tenemos el objeto
+            _queueEpisodios.value = _queueEpisodios.value + episodio
+            Timber.d("Added '${episodio.title}' to queue. New queue size: ${_queueEpisodios.value.size}")
         } else {
-            Timber.Forest.d("Podcast '${podcast.title}' is already in queue.")
+            Timber.d("Episodio '${episodio.title}' is already in queue.")
         }
     }
 
-    fun removePodcastFromQueue(podcast: Podcast) {
-        if (_queuePodcastUrls.value.contains(podcast.url)) {
-            _queuePodcastUrls.value = _queuePodcastUrls.value - podcast.url
+    fun removeEpisodeFromQueue(episodio: Episodio) {
+        if (_queueEpisodeIds.value.contains(episodio.id)) {
+            _queueEpisodeIds.value = _queueEpisodeIds.value - episodio.id
             saveQueueState()
-            updateQueuePodcastsList()
-            Timber.Forest.d("Removed '${podcast.title}' from queue. Current queue size: ${_queuePodcastUrls.value.size}")
+            _queueEpisodios.value = _queueEpisodios.value.filterNot { it.id == episodio.id }
+            Timber.d("Removed '${episodio.title}' from queue.")
         }
     }
 
     /**
-     * Elimina el podcast actual de la cabeza de la cola y devuelve el siguiente podcast.
-     * @param playedPodcastUrl La URL del podcast que acaba de terminar.
-     * @return El siguiente podcast en la cola, o null si la cola está vacía.
+     * Elimina el episodio actual de la cabeza de la cola y devuelve el siguiente.
+     * @param playedEpisodeId El ID del episodio que acaba de terminar.
+     * @return El siguiente [Episodio] en la cola, o null si la cola está vacía o el siguiente no se puede cargar.
      */
-    fun dequeuePodcast(playedPodcastUrl: String): Podcast? {
-        val currentQueue = _queuePodcastUrls.value.toMutableList()
-        if (currentQueue.isNotEmpty() && currentQueue.first() == playedPodcastUrl) {
-            currentQueue.removeAt(0) // Elimina el podcast que acaba de terminar
-        } else {
-            // Si el podcast que terminó no era el primero en la cola (ej. reproducción manual o salto),
-            // lo eliminamos si está en la cola, pero no avanzamos la cola automáticamente a menos que sea el primero.
-            currentQueue.remove(playedPodcastUrl)
-        }
-        _queuePodcastUrls.value = currentQueue
-        saveQueueState()
-        updateQueuePodcastsList()
-        Timber.Forest.d("Dequeued podcast. Current queue size: ${_queuePodcastUrls.value.size}")
+    suspend fun dequeueNextEpisode(playedEpisodeId: Int): Episodio? {
+        val currentIds = _queueEpisodeIds.value.toMutableList()
+        val playedIndex = currentIds.indexOf(playedEpisodeId)
 
-        return if (_queuePodcastUrls.value.isNotEmpty()) {
-            _allPodcasts.find { it.url == _queuePodcastUrls.value.first() }
-        } else {
-            null
+        if (playedIndex != -1) {
+            currentIds.removeAt(playedIndex) // Elimina el que se reprodujo
+            if (playedIndex < currentIds.size) { // Si había uno después del que se eliminó en esa posición
+                _queueEpisodeIds.value = currentIds
+                saveQueueState()
+                val nextEpisodeId = currentIds[playedIndex] // El siguiente es el que ahora ocupa esa posición
+                updateQueueEpisodiosListFromIds() // Actualiza la lista de objetos
+                return _queueEpisodios.value.find { it.id == nextEpisodeId } ?: wordpressService.getEpisodio(nextEpisodeId)
+            } else if (currentIds.isNotEmpty() && playedIndex == 0) { // Si se eliminó el primero y aún quedan
+                _queueEpisodeIds.value = currentIds
+                saveQueueState()
+                val nextEpisodeId = currentIds.first()
+                updateQueueEpisodiosListFromIds()
+                return _queueEpisodios.value.find { it.id == nextEpisodeId } ?: wordpressService.getEpisodio(nextEpisodeId)
+            } else { // La cola está vacía o se eliminó el último
+                _queueEpisodeIds.value = currentIds
+                saveQueueState()
+                updateQueueEpisodiosListFromIds()
+                return null
+            }
         }
+        // Si el playedEpisodeId no estaba en la cola (caso raro, pero seguro)
+        updateQueueEpisodiosListFromIds() // Sincroniza por si acaso
+        return _queueEpisodios.value.firstOrNull() // Devuelve el primero de la cola actual
     }
+
+    fun clearQueue() {
+        _queueEpisodeIds.value = emptyList()
+        _queueEpisodios.value = emptyList()
+        saveQueueState()
+        Timber.d("Queue cleared.")
+    }
+
+    // TODO: Implementar reorderQueue si es necesario, actualizando _queueEpisodeIds,
+    // guardando, y luego llamando a updateQueueEpisodiosListFromIds.
 }
