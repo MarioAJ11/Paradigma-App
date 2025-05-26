@@ -40,8 +40,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SearchScreen(
     searchViewModel: SearchViewModel,
-    queueViewModel: QueueViewModel,
-    downloadedViewModel: DownloadedEpisodioViewModel,
+    queueViewModel: QueueViewModel, // Recibe el ViewModel de la cola
+    downloadedViewModel: DownloadedEpisodioViewModel, // Recibe el ViewModel de descargas
     onEpisodeSelected: (Episodio) -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -108,7 +108,9 @@ fun SearchScreen(
                 searchError != null && searchResults.isEmpty() -> {
                     // Mensaje de error o "no se encontraron resultados"
                     Box(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -121,7 +123,9 @@ fun SearchScreen(
                 }
                 searchText.length > 2 && searchResults.isEmpty() && !isSearching && searchError == null -> {
                     // Este caso es para cuando la búsqueda finalizó pero no arrojó resultados, y no fue un error de API
-                    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp), contentAlignment = Alignment.Center) {
                         Text(
                             text = "No se encontraron resultados para \"$searchText\".",
                             style = MaterialTheme.typography.bodyLarge,
@@ -139,13 +143,29 @@ fun SearchScreen(
                         items(searchResults, key = { episodio -> episodio.id }) { episodio ->
                             EpisodioListItem(
                                 episodio = episodio,
-                                onEpisodeSelected = { onEpisodeSelected(episodio) },
+                                onEpisodeClicked = { onEpisodeSelected(episodio) },
                                 onAddToQueue = { queueViewModel.addEpisodeToQueue(episodio) },
                                 onRemoveFromQueue = { queueViewModel.removeEpisodeFromQueue(episodio) },
-                                onDownloadEpisode = { ep, onMsg -> downloadedViewModel.downloadEpisodio(ep, onMsg) },
-                                onDeleteDownload = { downloadedViewModel.deleteDownloadedEpisodio(episodio) },
-                                isDownloaded = downloadedViewModel.downloadedEpisodeIds.collectAsState().value.contains(episodio.id),
-                                isInQueue = queueViewModel.queueEpisodeIds.collectAsState().value.contains(episodio.id)
+                                onDownloadEpisode = { ep, onMsgCallback ->
+                                    downloadedViewModel.downloadEpisodio(ep) { message ->
+                                        // Lógica para mostrar mensaje (Snackbar)
+                                        onMsgCallback(message)
+                                    }
+                                },
+                                onDeleteDownload = {
+                                    downloadedViewModel.deleteDownloadedEpisodio(
+                                        episodio
+                                    )
+                                },
+                                // Los estados también vienen de los ViewModels:
+                                isDownloaded = downloadedViewModel.downloadedEpisodeIds.collectAsState().value.contains(
+                                    episodio.id
+                                ),
+                                isInQueue = queueViewModel.queueEpisodeIds.collectAsState().value.contains(
+                                    episodio.id
+                                ),
+                                onEpisodeSelected = TODO(),
+                                modifier = TODO()
                             )
                         }
                     }
@@ -153,7 +173,9 @@ fun SearchScreen(
                 searchText.length <= 2 && !isSearching -> {
                     // Mensaje para que el usuario escriba más
                     Box(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -167,7 +189,9 @@ fun SearchScreen(
                 else -> {
                     // Estado inicial o cuando la query es muy corta y no hay error
                     Box(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         // Podrías poner un icono de búsqueda o un mensaje de bienvenida

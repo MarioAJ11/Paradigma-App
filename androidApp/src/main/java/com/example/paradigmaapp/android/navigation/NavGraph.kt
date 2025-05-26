@@ -1,22 +1,22 @@
 package com.example.paradigmaapp.android.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.BottomSheetScaffold
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.paradigmaapp.android.audio.AudioPlayer
 import com.example.paradigmaapp.android.audio.VolumeControl
-import com.example.paradigmaapp.android.data.AppPreferences
 import com.example.paradigmaapp.android.screens.*
 import com.example.paradigmaapp.android.ui.SettingsScreen
 import com.example.paradigmaapp.android.viewmodel.*
@@ -25,7 +25,8 @@ import timber.log.Timber
 
 /**
  * Define el grafo de navegación principal de la aplicación.
- * También incluye el BottomSheetScaffold y el AudioPlayer global.
+ * Incluye el BottomSheetScaffold, AudioPlayer global, y gestiona la instanciación
+ * de ViewModels específicos de pantalla usando la ViewModelFactory.
  *
  * @author Mario Alguacil Juárez
  */
@@ -33,25 +34,27 @@ import timber.log.Timber
 @Composable
 fun NavGraph(
     navController: NavHostController = rememberNavController(),
+    viewModelFactory: ViewModelFactory, // Factory para crear ViewModels
     mainViewModel: MainViewModel,
-    searchViewModel: SearchViewModel,
-    queueViewModel: QueueViewModel,
-    downloadedViewModel: DownloadedEpisodioViewModel,
-    onGoingViewModel: OnGoingEpisodioViewModel,
-    appPreferences: AppPreferences
+    searchViewModel: SearchViewModel
 ) {
     val coroutineScope = rememberCoroutineScope()
 
+    // Estados del reproductor (observados desde MainViewModel)
     val currentPlayingEpisode by mainViewModel.currentPlayingEpisode.collectAsState()
     val isPodcastPlaying by mainViewModel.isPodcastPlaying.collectAsState()
     val isAndainaPlaying by mainViewModel.isAndainaPlaying.collectAsState()
     val isPlayingGeneral = if (currentPlayingEpisode != null) isPodcastPlaying else isAndainaPlaying
-
     val episodeProgress by mainViewModel.podcastProgress.collectAsState()
     val isAndainaStreamActive by mainViewModel.isAndainaStreamActive.collectAsState()
 
     val volumeBottomSheetScaffoldState = rememberBottomSheetScaffoldState()
     var showSettingsDialog by remember { mutableStateOf(false) }
+
+    // Acceder a los ViewModels que MainViewModel ya tiene instancias
+    val queueViewModel = mainViewModel.queueViewModel
+    val downloadedViewModel = mainViewModel.downloadedViewModel
+    val onGoingViewModel = mainViewModel.onGoingViewModel
 
     BottomSheetScaffold(
         scaffoldState = volumeBottomSheetScaffoldState,
@@ -87,33 +90,53 @@ fun NavGraph(
                 composable(Screen.Home.route) {
                     HomeScreen(
                         mainViewModel = mainViewModel,
-                        queueViewModel = queueViewModel,
-                        downloadedViewModel = downloadedViewModel,
-                        onEpisodeSelected = { episodio ->
-                            mainViewModel.selectEpisode(episodio)
+                        onProgramaSelected = { progId, progNombre -> // HomeScreen debe tener este parámetro
+                            navController.navigate(Screen.Programa.createRoute(progId, progNombre))
                         },
                         onNavigateToSearch = { navController.navigate(Screen.Search.route) }
                     )
                 }
+
+                composable(
+                    route = Screen.Programa.route, // Asegúrate que Screen.Programa está definido en Screen.kt
+                    arguments = listOf(
+                        navArgument("programaId") { type = NavType.IntType },
+                        navArgument("programaNombre") { type = NavType.StringType }
+                    )
+                ) { navBackStackEntry ->
+                    val programaViewModel: ProgramaViewModel = viewModel(
+                        viewModelStoreOwner = navBackStackEntry,
+                        factory = viewModelFactory // Usa la factory global
+                    )
+                    val programaNombreArg = navBackStackEntry.arguments?.getString("programaNombre")?.let { Uri.decode(it) }
+                        ?: programaViewModel.programaNombre
+
+                    ProgramaScreen(
+                        programaViewModel = programaViewModel,
+                        mainViewModel = mainViewModel,
+                        queueViewModel = queueViewModel,
+                        downloadedViewModel = downloadedViewModel,
+                        programaNombreFallback = programaNombreArg,
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
                 composable(Screen.Search.route) {
-                    // Pasar todos los ViewModels necesarios para las acciones de EpisodioListItem
                     SearchScreen(
-                        searchViewModel = searchViewModel,
-                        queueViewModel = queueViewModel, // Pasar QueueViewModel
-                        downloadedViewModel = downloadedViewModel, // Pasar DownloadedViewModel
+                        searchViewModel = searchViewModel, // ViewModel para la lógica de búsqueda
+                        queueViewModel = queueViewModel,   // ViewModel para la lógica de cola
+                        downloadedViewModel = downloadedViewModel, // ViewModel para la lógica de descargas
                         onEpisodeSelected = { episodio ->
                             mainViewModel.selectEpisode(episodio)
-                            navController.popBackStack()
+                            // ... (lógica de navegación opcional) ...
                         },
                         onBackClick = { navController.popBackStack() }
-                        // Las acciones como onAddToQueue, etc., se manejan dentro de SearchScreen
-                        // usando los ViewModels que se le pasan, los cuales a su vez se los pasan a EpisodioListItem.
                     )
                 }
                 composable(Screen.Downloads.route) {
-                    DownloadedEpisodioScreen(
+                    DownloadedEpisodioScreen( // Tu pantalla renombrada
                         downloadedEpisodioViewModel = downloadedViewModel,
-                        queueViewModel = queueViewModel,
+                        queueViewModel = queueViewModel, // Pasar para EpisodioListItem
                         onEpisodeSelected = { episodio -> mainViewModel.selectEpisode(episodio) },
                         onBackClick = { navController.popBackStack() }
                     )
@@ -121,16 +144,16 @@ fun NavGraph(
                 composable(Screen.Queue.route) {
                     QueueScreen(
                         queueViewModel = queueViewModel,
-                        downloadedViewModel = downloadedViewModel,
+                        downloadedViewModel = downloadedViewModel, // Pasar para EpisodioListItem
                         onEpisodeSelected = { episodio -> mainViewModel.selectEpisode(episodio) },
                         onBackClick = { navController.popBackStack() }
                     )
                 }
                 composable(Screen.OnGoing.route) {
-                    OnGoingEpisodioScreen(
+                    OnGoingEpisodioScreen( // Tu pantalla renombrada
                         onGoingEpisodioViewModel = onGoingViewModel,
-                        queueViewModel = queueViewModel,
-                        downloadedViewModel = downloadedViewModel,
+                        queueViewModel = queueViewModel, // Pasar para EpisodioListItem
+                        downloadedViewModel = downloadedViewModel, // Pasar para EpisodioListItem
                         onEpisodeSelected = { episodio -> mainViewModel.selectEpisode(episodio) },
                         onBackClick = { navController.popBackStack() }
                     )
@@ -148,8 +171,8 @@ fun NavGraph(
                 onPlayPauseClick = { mainViewModel.onPlayerPlayPauseClick() },
                 onPlayStreamingClick = { mainViewModel.toggleAndainaStreamActive() },
                 onEpisodeInfoClick = { episodio ->
-                    Timber.d("Info click para episodio: ${episodio.title} (navegación no implementada)")
-                    // Ejemplo: navController.navigate("episode_detail/${episodio.id}")
+                    Timber.d("Info click para episodio: ${episodio.title}")
+                    navController.navigate("episode_detail_screen/${episodio.id}")
                 },
                 onVolumeIconClick = {
                     coroutineScope.launch {
@@ -162,10 +185,11 @@ fun NavGraph(
                 }
             )
 
-            BottomNavigationBar( // Asegúrate que este Composable existe y está importado
+            BottomNavigationBar(
+                navController = navController,
                 onSearchClick = {
                     if (navController.currentDestination?.route != Screen.Search.route) {
-                        navController.navigate(Screen.Search.route)
+                        navController.navigate(Screen.Search.route) { popUpTo(Screen.Home.route) }
                     }
                 },
                 onOnGoingClick = { navController.navigate(Screen.OnGoing.route) { launchSingleTop = true; popUpTo(Screen.Home.route) } },

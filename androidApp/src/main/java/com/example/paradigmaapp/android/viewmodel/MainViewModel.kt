@@ -11,6 +11,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.example.paradigmaapp.android.api.AndainaStream
 import com.example.paradigmaapp.android.data.AppPreferences
 import com.example.paradigmaapp.model.Episodio
+import com.example.paradigmaapp.model.Programa
 import com.example.paradigmaapp.repository.WordpressService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -39,6 +40,11 @@ class MainViewModel(
     val onGoingViewModel: OnGoingEpisodioViewModel, // Público
     val downloadedViewModel: DownloadedEpisodioViewModel // Público
 ) : ViewModel() {
+    private val _programas = MutableStateFlow<List<Programa>>(emptyList())
+    val programas: StateFlow<List<Programa>> = _programas.asStateFlow()
+
+    private val _isLoadingProgramas = MutableStateFlow(false) // Inicialmente podría ser true
+    val isLoadingProgramas: StateFlow<Boolean> = _isLoadingProgramas.asStateFlow()
 
     private val _initialEpisodios = MutableStateFlow<List<Episodio>>(emptyList())
     val initialEpisodios: StateFlow<List<Episodio>> = _initialEpisodios.asStateFlow()
@@ -159,6 +165,21 @@ class MainViewModel(
                 _isAndainaPlaying.value = isPlaying
             }
         })
+    }
+
+    fun loadInitialProgramas() {
+        viewModelScope.launch {
+            _isLoadingProgramas.value = true
+            try {
+                val fetchedProgramas = wordpressService.getProgramas() // Debe devolver List<Programa>
+                _programas.value = fetchedProgramas
+            } catch (e: Exception) {
+                _programas.value = emptyList() // Manejo de error
+                Timber.e(e, "Error cargando programas")
+            } finally {
+                _isLoadingProgramas.value = false
+            }
+        }
     }
 
     fun loadInitialData() {

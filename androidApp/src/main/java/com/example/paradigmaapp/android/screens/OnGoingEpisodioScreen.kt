@@ -35,8 +35,8 @@ import com.example.paradigmaapp.model.Episodio
 @Composable
 fun OnGoingEpisodioScreen(
     onGoingEpisodioViewModel: OnGoingEpisodioViewModel,
-    queueViewModel: QueueViewModel,
-    downloadedViewModel: DownloadedEpisodioViewModel,
+    queueViewModel: QueueViewModel, // Asegúrate de que lo recibe
+    downloadedViewModel: DownloadedEpisodioViewModel, // Asegúrate de que lo recibe
     onEpisodeSelected: (Episodio) -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -111,11 +111,11 @@ fun OnGoingEpisodioScreen(
                         },
                         onDeleteDownload = { downloadedViewModel.deleteDownloadedEpisodio(episodio) },
                         isDownloaded = downloadedEpisodeIds.contains(episodio.id),
-                        isInQueue = queueEpisodeIds.contains(episodio.id)
-                        // Considera pasar y mostrar el progreso del episodio si tu
-                        // OnGoingEpisodioViewModel provee esta información de forma detallada
-                        // y EpisodioListItem está preparado para mostrar una barra de progreso.
-                    )
+                        isInQueue = queueEpisodeIds.contains(episodio.id),
+                        modifier = TODO(),
+                        onEpisodeClicked = TODO()
+                    ) 
+
                 }
             }
         }

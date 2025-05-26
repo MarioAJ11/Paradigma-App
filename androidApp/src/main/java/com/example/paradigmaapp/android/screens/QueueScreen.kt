@@ -92,10 +92,17 @@ fun QueueScreen(
                         onEpisodeSelected = onEpisodeSelected,
                         onAddToQueue = { /* Ya está en la cola, quizá reordenar o no hacer nada */ },
                         onRemoveFromQueue = { queueViewModel.removeEpisodeFromQueue(it) },
-                        onDownloadEpisode = { ep, onMsg -> downloadedViewModel.downloadEpisodio(ep, onMsg) },
+                        onDownloadEpisode = { ep, onMsg ->
+                            downloadedViewModel.downloadEpisodio(
+                                ep,
+                                onMsg
+                            )
+                        },
                         onDeleteDownload = { downloadedViewModel.deleteDownloadedEpisodio(it) },
                         isDownloaded = downloadedEpisodeIds.contains(episodio.id),
-                        isInQueue = true // Todos los items aquí están en cola
+                        isInQueue = true,
+                        modifier = TODO(),
+                        onEpisodeClicked = TODO() // Todos los items aquí están en cola
                     )
                 }
             }

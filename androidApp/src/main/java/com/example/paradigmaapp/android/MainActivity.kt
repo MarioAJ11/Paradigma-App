@@ -6,70 +6,64 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import androidx.media3.common.BuildConfig
+// Importa el BuildConfig de tu propio módulo de aplicación
 import com.example.paradigmaapp.android.data.AppPreferences
-import com.example.paradigmaapp.android.viewmodel.*
+import com.example.paradigmaapp.android.viewmodel.* // Asegúrate que todos los ViewModels están aquí
 import com.example.paradigmaapp.repository.WordpressService
 import timber.log.Timber
 
 /**
  * Actividad principal de la aplicación.
- * Configura el tema, los ViewModels y el Composable raíz de la interfaz de usuario (UI).
+ * Configura el tema, los ViewModels y el Composable raíz de la UI.
  *
  * @author Mario Alguacil Juárez
  */
 class MainActivity : ComponentActivity() {
 
-    // Factory para crear instancias de nuestros ViewModels con sus dependencias.
     private lateinit var viewModelFactory: ViewModelFactory
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Habilita la visualización de borde a borde para una UI más inmersiva.
-        // Esto permite que la UI se dibuje debajo de las barras de sistema (estado y navegación).
-        // Necesitarás manejar los insets (márgenes) en tus Composables (ej. con .statusBarsPadding()).
         enableEdgeToEdge()
 
-        // Inicialización de Timber para logging (registros).
-        // Solo se planta el DebugTree si la aplicación está en modo DEBUG.
-        // BuildConfig.DEBUG es generado automáticamente por Gradle para tu módulo de aplicación.
-        if (BuildConfig.DEBUG) {
+        // Inicialización de Timber para logging (solo en Debug)
+        if (BuildConfig.DEBUG) { // Usa el BuildConfig generado para tu app
             Timber.plant(Timber.DebugTree())
         }
 
-        // Inicializa las dependencias básicas.
-        // En una aplicación más grande o de producción, considera usar un framework de
-        // Inyección de Dependencias como Hilt o Koin para gestionar esto.
+        // Inicializa dependencias básicas.
         val appPreferences = AppPreferences(applicationContext)
-        val wordpressService = WordpressService() // Idealmente, esto también sería inyectado.
+        val wordpressService = WordpressService() // Idealmente, esto sería inyectado.
 
-        // Crea la factoría de ViewModels con las dependencias necesarias.
+        // Crea la factoría de ViewModels.
+        // 'this' (la Activity) actúa como SavedStateRegistryOwner.
         viewModelFactory = ViewModelFactory(
             appPreferences = appPreferences,
             wordpressService = wordpressService,
-            applicationContext = applicationContext // Se pasa el contexto de la aplicación.
+            applicationContext = applicationContext,
+            owner = this // Pasar la Activity como SavedStateRegistryOwner
+            // defaultArgs = intent?.extras // Opcional, si tienes argumentos de intent para el SavedStateHandle inicial
         )
 
-        // Establece el contenido de la actividad usando Jetpack Compose.
         setContent {
-            // Aplica el tema personalizado (definido en Theme.kt) a toda la jerarquía de Composables.
-            Theme {
+            Theme { // Tu Composable Theme existente
                 // Obtiene las instancias de los ViewModels usando la ViewModelProvider y la factory.
-                // El ciclo de vida de estos ViewModels estará ligado al de esta Activity.
+                // 'this' (la Activity) es el ViewModelStoreOwner.
                 val mainViewModel: MainViewModel = ViewModelProvider(this, viewModelFactory)[MainViewModel::class.java]
                 val searchViewModel: SearchViewModel = ViewModelProvider(this, viewModelFactory)[SearchViewModel::class.java]
-                val queueViewModel: QueueViewModel = ViewModelProvider(this, viewModelFactory)[QueueViewModel::class.java]
-                val downloadedViewModel: DownloadedEpisodioViewModel = ViewModelProvider(this, viewModelFactory)[DownloadedEpisodioViewModel::class.java]
-                val onGoingViewModel: OnGoingEpisodioViewModel = ViewModelProvider(this, viewModelFactory)[OnGoingEpisodioViewModel::class.java]
+                // Los siguientes ViewModels son instanciados por MainViewModel o por la factory directamente
+                // y pasados a MainViewModel. Aquí nos aseguramos que MainViewModel tiene las referencias correctas.
+                // Si se necesitan en otros lugares, se obtendrían con el factory de manera similar.
+                // QueueViewModel, DownloadedEpisodioViewModel, OnGoingEpisodioViewModel son accedidos via mainViewModel.
 
-                // Llama al Composable raíz de la aplicación, pasando los ViewModels y otras dependencias.
                 ParadigmaApp(
+                    viewModelFactory = viewModelFactory, // Pasar la factory para ViewModels anidados en NavGraph si es necesario
                     mainViewModel = mainViewModel,
-                    searchViewModel = searchViewModel,
-                    queueViewModel = queueViewModel,
-                    downloadedViewModel = downloadedViewModel,
-                    onGoingViewModel = onGoingViewModel,
-                    appPreferences = appPreferences // Se pasa appPreferences por si algún Composable de UI lo necesita directamente, aunque es mejor a través de ViewModel.
+                    searchViewModel = searchViewModel
+                    // Los otros ViewModels principales (Queue, Downloaded, OnGoing)
+                    // ahora son accedidos a través de MainViewModel si es necesario,
+                    // o instanciados directamente en NavGraph con la factory si se prefiere
+                    // y el NavBackStackEntry como owner.
                 )
             }
         }

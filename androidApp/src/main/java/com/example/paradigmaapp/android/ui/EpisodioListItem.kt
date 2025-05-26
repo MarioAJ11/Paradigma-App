@@ -48,7 +48,8 @@ fun EpisodioListItem(
     onDeleteDownload: (Episodio) -> Unit,
     isDownloaded: Boolean,
     isInQueue: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onEpisodeClicked: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current // Para el Snackbar u otro feedback

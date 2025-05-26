@@ -29,8 +29,8 @@ class WordpressService {
                 parameter("_fields", "id,name,slug,description,count") // Campos deseados
             }.body()
         } catch (e: Exception) {
-            println("Error fetching programas: ${e.message}") // Manejo básico de errores
-            throw e // O devuelve emptyList() o un Result sellado
+            println("Error fetching programas: ${e.message}")
+            throw e
         }
     }
 

@@ -1,93 +1,104 @@
 package com.example.paradigmaapp.android.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.items // Asegúrate de importar items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.* // Importa getValue y collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.paradigmaapp.android.ui.EpisodioListItem
-import com.example.paradigmaapp.android.ui.SearchBar // Si quieres un SearchBar aquí
-import com.example.paradigmaapp.android.viewmodel.DownloadedEpisodioViewModel
+import com.example.paradigmaapp.android.ui.ProgramaListItem // Importa tu Composable para items de programa
 import com.example.paradigmaapp.android.viewmodel.MainViewModel
-import com.example.paradigmaapp.android.viewmodel.QueueViewModel
-import com.example.paradigmaapp.model.Episodio
+import com.example.paradigmaapp.model.Programa // Importa el modelo Programa del módulo shared
 
 /**
- * Pantalla principal que muestra la lista de episodios.
- * Puede incluir una barra de búsqueda para filtrar la lista actual o navegar a SearchScreen.
+ * Pantalla principal que muestra la lista de programas de radio.
+ * Al seleccionar un programa, se navega a la pantalla de sus episodios.
  *
- * @param mainViewModel ViewModel principal para el estado global y episodios.
- * @param queueViewModel ViewModel para acciones de cola.
- * @param downloadedViewModel ViewModel para acciones de descarga.
- * @param onEpisodeSelected Lambda para manejar la selección de un episodio.
+ * @param mainViewModel ViewModel principal para obtener la lista de programas.
+ * @param onProgramaSelected Lambda que se invoca cuando un programa es seleccionado.
+ * Recibe el ID y el nombre del programa para la siguiente pantalla.
  * @param onNavigateToSearch Lambda para navegar a la pantalla de búsqueda dedicada.
  * @author Mario Alguacil Juárez
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     mainViewModel: MainViewModel,
-    queueViewModel: QueueViewModel,
-    downloadedViewModel: DownloadedEpisodioViewModel,
-    onEpisodeSelected: (Episodio) -> Unit,
+    onProgramaSelected: (programaId: Int, programaNombre: String) -> Unit,
     onNavigateToSearch: () -> Unit
 ) {
-    val initialEpisodios by mainViewModel.initialEpisodios.collectAsState()
-    val isLoading by mainViewModel.isLoadingInitial.collectAsState()
-    val context = LocalContext.current
+    // Asegúrate de que mainViewModel.programas es StateFlow<List<Programa>>
+    // y mainViewModel.isLoadingProgramas es StateFlow<Boolean>
+    val programas: List<Programa> by mainViewModel.programas.collectAsState()
+    val isLoadingProgramas: Boolean by mainViewModel.isLoadingProgramas.collectAsState()
 
-    // Estados para el SearchBar local si decides tener uno aquí además de la pantalla de búsqueda
-    var localSearchText by remember { mutableStateOf("") }
-    val filteredEpisodios = remember(initialEpisodios, localSearchText) {
-        if (localSearchText.isBlank()) {
-            initialEpisodios
-        } else {
-            initialEpisodios.filter {
-                it.title.contains(localSearchText, ignoreCase = true) ||
-                        it.excerpt?.contains(localSearchText, ignoreCase = true) == true
-            }
-        }
-    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        TopAppBar(
+            title = {
+                Text(
+                    "Programas",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            actions = {
+                IconButton(onClick = onNavigateToSearch) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = "Buscar Episodios"
+                    )
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                titleContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            modifier = Modifier.statusBarsPadding()
+        )
 
-    val downloadedEpisodeIds by downloadedViewModel.downloadedEpisodeIds.collectAsState()
-    val queueEpisodeIds by queueViewModel.queueEpisodeIds.collectAsState()
-
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        if (isLoading) {
+        if (isLoadingProgramas) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-        } else if (filteredEpisodios.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        } else if (programas.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = if (localSearchText.isBlank()) "No hay episodios disponibles."
-                    else "No se encontraron episodios para \"$localSearchText\".",
+                    text = "No hay programas disponibles en este momento. Intenta refrescar.",
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(16.dp)
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 8.dp)
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(filteredEpisodios, key = { it.id }) { episodio ->
-                    EpisodioListItem(
-                        episodio = episodio,
-                        onEpisodeSelected = onEpisodeSelected,
-                        onAddToQueue = { queueViewModel.addEpisodeToQueue(it) },
-                        onRemoveFromQueue = { queueViewModel.removeEpisodeFromQueue(it) },
-                        onDownloadEpisode = { ep, onMsg ->
-                            downloadedViewModel.downloadEpisodio(ep, onMsg)
-                        },
-                        onDeleteDownload = { downloadedViewModel.deleteDownloadedEpisodio(it) },
-                        isDownloaded = downloadedEpisodeIds.contains(episodio.id),
-                        isInQueue = queueEpisodeIds.contains(episodio.id)
+                // Aquí, 'programa' debería ser de tipo Programa
+                items(items = programas, key = { programa -> programa.id }) { programa ->
+                    ProgramaListItem(
+                        programa = programa, // Si aquí hay un type mismatch, 'programas' no es List<Programa>
+                        onClicked = {
+                            onProgramaSelected(programa.id, programa.name)
+                        }
                     )
                 }
             }

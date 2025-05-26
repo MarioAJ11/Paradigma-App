@@ -100,9 +100,15 @@ fun DownloadedEpisodioScreen(
                         // La acción de descargar no es aplicable aquí, ya están descargados.
                         // Se podría tener un callback `onPlayDownloaded` si la lógica de reproducción es diferente.
                         onDownloadEpisode = { _, onMsg -> onMsg("Este episodio ya está descargado.") },
-                        onDeleteDownload = { downloadedEpisodioViewModel.deleteDownloadedEpisodio(episodio) }, // Permitir eliminar descarga
+                        onDeleteDownload = {
+                            downloadedEpisodioViewModel.deleteDownloadedEpisodio(
+                                episodio
+                            )
+                        }, // Permitir eliminar descarga
                         isDownloaded = true, // Todos los items aquí están descargados
-                        isInQueue = queueEpisodeIds.contains(episodio.id)
+                        isInQueue = queueEpisodeIds.contains(episodio.id),
+                        modifier = TODO(),
+                        onEpisodeClicked = TODO()
                     )
                 }
             }
