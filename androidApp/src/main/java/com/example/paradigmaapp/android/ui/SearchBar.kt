@@ -6,16 +6,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
- * Composable para un campo de búsqueda con icono.
+ * Composable para un campo de búsqueda con icono y opción de limpiar.
  *
  * @param searchText El texto actual en el campo de búsqueda.
  * @param onSearchTextChanged Lambda que se invoca cuando el texto de búsqueda cambia.
+ * @param onClearSearch Lambda opcional que se invoca para limpiar el campo de búsqueda.
  * @param modifier Modificador opcional para aplicar a este Composable.
+ * @param label El texto para la etiqueta del campo de búsqueda.
  *
  * @author Mario Alguacil Juárez
  */
@@ -23,65 +26,53 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 fun SearchBar(
     searchText: String,
     onSearchTextChanged: (String) -> Unit,
-    modifier: Modifier = Modifier
+    onClearSearch: (() -> Unit)? = null, // Opcional para el botón de limpiar
+    modifier: Modifier = Modifier,
+    label: String = "Buscar..." // Label personalizable
 ) {
-    // Definir los colores para OutlinedTextField usando MaterialTheme.colorScheme
     val customTextFieldColors = OutlinedTextFieldDefaults.colors(
-        // Colores del borde
-        focusedBorderColor = MaterialTheme.colorScheme.primary, // Borde cuando está enfocado
-        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant, // Borde cuando no está enfocado
-        errorBorderColor = MaterialTheme.colorScheme.error, // Color del borde en estado de error
-
-        // Colores del texto de entrada
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        errorBorderColor = MaterialTheme.colorScheme.error,
         focusedTextColor = MaterialTheme.colorScheme.onSurface,
         unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
         errorTextColor = MaterialTheme.colorScheme.error,
-
-        // Colores de la etiqueta (label)
-        focusedLabelColor = MaterialTheme.colorScheme.primary, // Etiqueta cuando está enfocado
-        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant, // Etiqueta cuando no está enfocado
+        focusedLabelColor = MaterialTheme.colorScheme.primary,
+        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
         errorLabelColor = MaterialTheme.colorScheme.error,
-
-        // Colores del icono principal (leadingIcon)
-        focusedLeadingIconColor = MaterialTheme.colorScheme.primary, // Icono cuando está enfocado
-        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant, // Icono cuando no está enfocado
+        focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
         errorLeadingIconColor = MaterialTheme.colorScheme.error,
-
-        // Puedes añadir más si necesitas customizar el trailingIcon, cursor, placeholder, etc.
+        focusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant, // Color para el icono de limpiar
+        unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant, // Color para el icono de limpiar
+        cursorColor = MaterialTheme.colorScheme.primary
     )
 
     OutlinedTextField(
         value = searchText,
         onValueChange = onSearchTextChanged,
-        label = {
-            Text("Buscar...")
-            // El color del texto de la etiqueta ya lo hemos definido en customTextFieldColors.
-            // Si necesitaras un color diferente que no esté en el default, lo pondrías aquí
-            // color = MaterialTheme.colorScheme.onSurfaceVariant
-        },
+        label = { Text(label) },
         leadingIcon = {
             Icon(
-                Icons.Default.Search,
-                contentDescription = "Icono de búsqueda",
-                // El tint del icono también se controla por customTextFieldColors.
-                // Si necesitaras un tint diferente, lo pondrías aquí
-                // tint = MaterialTheme.colorScheme.onSurface
+                Icons.Filled.Search,
+                contentDescription = "Icono de búsqueda"
             )
         },
-        shape = RoundedCornerShape(28.dp),
+        trailingIcon = {
+            if (searchText.isNotEmpty() && onClearSearch != null) {
+                IconButton(onClick = onClearSearch) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Limpiar búsqueda"
+                    )
+                }
+            }
+        },
+        shape = RoundedCornerShape(28.dp), // Esquinas más redondeadas como en M3
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp),
-        colors = customTextFieldColors // Aplicar los colores personalizados
+            .heightIn(min = 56.dp), // Altura mínima estándar
+        colors = customTextFieldColors,
+        singleLine = true
     )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun PreviewSearchBar() {
-    // Asegúrate de envolver tu preview con tu tema para que los colores se apliquen
-    com.example.paradigmaapp.android.MyApplicationTheme {
-        var searchText by remember { mutableStateOf("") }
-        SearchBar(searchText = searchText, onSearchTextChanged = { searchText = it })
-    }
 }

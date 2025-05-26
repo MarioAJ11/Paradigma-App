@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             // Aplica el tema personalizado a toda la jerarquía de Composables debajo.
             // Esto asegura que los colores, tipografía, etc., definidos en MyApplicationTheme sean utilizados.
-            MyApplicationTheme {
+            Theme {
                 // Llama al Composable principal que define la estructura de la pantalla de Podcasts.
                 AppScreen()
             }
