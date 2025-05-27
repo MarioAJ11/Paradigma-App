@@ -81,6 +81,7 @@ class MainViewModel(
     init {
         setupPodcastPlayerListeners()
         setupAndainaPlayerListeners()
+        loadInitialProgramas()
         loadInitialData()
         startProgressUpdates()
 
@@ -173,6 +174,7 @@ class MainViewModel(
             try {
                 val fetchedProgramas = wordpressService.getProgramas() // Debe devolver List<Programa>
                 _programas.value = fetchedProgramas
+                Timber.d("Cargados ${fetchedProgramas.size} programas.")
             } catch (e: Exception) {
                 _programas.value = emptyList() // Manejo de error
                 Timber.e(e, "Error cargando programas")

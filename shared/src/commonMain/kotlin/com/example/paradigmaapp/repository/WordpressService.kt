@@ -15,32 +15,39 @@ import io.ktor.http.*
  */
 class WordpressService {
 
-    private val baseUrl = "https://pruebas.paradigmamedia.org/wp-json/wp/v2" // Correcto
-
-    suspend fun getProgramas(): List<Programa> {
-        // LA URL DEBE SER AL ENDPOINT DE TU TAXONOMÍA "radio"
-        return ktorClient.get("$baseUrl/radio") { // Ejemplo: si tu taxonomía se llama "radio"
-            parameter("per_page", 100)
-            parameter("_fields", "id,name,slug,description,count")
-        }.body() // Ktor intentará deserializar la respuesta a List<Programa>
-    }
-
-
-
+    private val baseUrl = "https://pruebas.paradigmamedia.org/wp-json/wp/v2"
 
     /**
-     * Obtiene la lista de episodios para un programa específico.
+     * Obtiene la lista de programas (términos de la taxonomía 'radio').
+     *
+     * @return Una lista de [Programa].
+     * @throws Exception Si ocurre un error durante la petición.
+     */
+    suspend fun getProgramas(): List<Programa> {
+        return ktorClient.get("$baseUrl/radio") { // Endpoint para la taxonomía 'radio'
+            parameter("per_page", 100) // Puedes ajustar la cantidad de programas a obtener
+            // Los campos id, name, slug, description, count vienen por defecto para taxonomías
+        }.body()
+    }
+
+    /**
+     * Obtiene la lista de episodios (posts) para un programa específico.
      *
      * @param programaId El ID del programa (término de la taxonomía 'radio').
+     * @param page El número de página a obtener.
+     * @param perPage El número de episodios por página.
      * @return Una lista de [Episodio].
      * @throws Exception Si ocurre un error durante la petición.
      */
-    suspend fun getEpisodiosPorPrograma(programaId: Int): List<Episodio> {
+    suspend fun getEpisodiosPorPrograma(programaId: Int, page: Int = 1, perPage: Int = 10): List<Episodio> {
         return try {
-            ktorClient.get("$baseUrl/episodios") { // 'episodios' es el slug de tu CPT
+            ktorClient.get("$baseUrl/posts") { // Endpoint para los posts (que usas como episodios)
                 parameter("radio", programaId) // Filtra episodios por el ID de la taxonomía 'radio'
-                parameter("per_page", 100)     // Pide hasta 100 episodios por programa
-                parameter("_embed", "wp:featuredmedia,wp:term") // Embeber imagen y términos
+                parameter("page", page)
+                parameter("per_page", perPage)
+                parameter("orderby", "date") // Ordenar por fecha
+                parameter("order", "desc")   // Los más recientes primero
+                parameter("_embed", "wp:featuredmedia,wp:term") // Embeber imagen destacada y términos de taxonomía
             }.body()
         } catch (e: Exception) {
             println("Error fetching episodios for programa $programaId: ${e.message}")
@@ -49,7 +56,7 @@ class WordpressService {
     }
 
     /**
-     * Obtiene todos los episodios de forma paginada.
+     * Obtiene todos los episodios (posts) de forma paginada.
      *
      * @param page El número de página a obtener.
      * @param perPage El número de episodios por página.
@@ -57,27 +64,26 @@ class WordpressService {
      * @throws Exception Si ocurre un error durante la petición.
      */
     suspend fun getAllEpisodios(page: Int = 1, perPage: Int = 20): List<Episodio> {
-        // LA URL DEBE SER AL ENDPOINT DE TU CUSTOM POST TYPE "episodios"
-        return ktorClient.get("$baseUrl/episodios") { // Ejemplo: si tu CPT se llama "episodios"
+        return ktorClient.get("$baseUrl/posts") { // Endpoint para los posts
             parameter("page", page)
             parameter("per_page", perPage)
             parameter("orderby", "date")
             parameter("order", "desc")
-            parameter("_embed", "wp:featuredmedia,wp:term") // Para incluir imagen y términos de programa
-        }.body() // Ktor intentará deserializar la respuesta a List<Episodio>
+            parameter("_embed", "wp:featuredmedia,wp:term")
+        }.body()
     }
 
 
     /**
-     * Obtiene un episodio específico por su ID.
+     * Obtiene un episodio (post) específico por su ID.
      *
-     * @param episodioId El ID del episodio.
+     * @param episodioId El ID del episodio (post).
      * @return El [Episodio] o null si no se encuentra o hay error.
      * @throws Exception Si ocurre un error grave durante la petición (diferente de 404).
      */
     suspend fun getEpisodio(episodioId: Int): Episodio? {
         return try {
-            ktorClient.get("$baseUrl/episodios/$episodioId") {
+            ktorClient.get("$baseUrl/posts/$episodioId") { // Endpoint para un post específico
                 parameter("_embed", "wp:featuredmedia,wp:term")
             }.body()
         } catch (e: io.ktor.client.plugins.ClientRequestException) {
@@ -94,7 +100,7 @@ class WordpressService {
     }
 
     /**
-     * Busca episodios que coincidan con un término de búsqueda.
+     * Busca episodios (posts) que coincidan con un término de búsqueda.
      * WordPress busca por defecto en título y contenido.
      *
      * @param searchTerm El término a buscar.
@@ -104,7 +110,7 @@ class WordpressService {
     suspend fun buscarEpisodios(searchTerm: String): List<Episodio> {
         if (searchTerm.isBlank()) return emptyList()
         return try {
-            ktorClient.get("$baseUrl/episodios") {
+            ktorClient.get("$baseUrl/posts") { // Endpoint para los posts
                 parameter("search", searchTerm)
                 parameter("per_page", 50) // Limita el número de resultados de búsqueda
                 parameter("_embed", "wp:featuredmedia,wp:term")

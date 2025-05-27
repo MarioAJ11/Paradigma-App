@@ -44,6 +44,10 @@ fun HomeScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        Spacer(
+            modifier = Modifier
+                .padding(top = 56.dp)
+        )
         if (isLoadingProgramas) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
