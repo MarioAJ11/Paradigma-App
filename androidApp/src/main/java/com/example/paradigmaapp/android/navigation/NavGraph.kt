@@ -1,6 +1,7 @@
 package com.example.paradigmaapp.android.navigation
 
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -52,13 +53,14 @@ fun NavGraph(
     var showSettingsDialog by remember { mutableStateOf(false) }
 
     // Acceder a los ViewModels que MainViewModel ya tiene instancias
+    // Estos ViewModels son gestionados por MainViewModel o creados por la factory según sea necesario.
     val queueViewModel = mainViewModel.queueViewModel
     val downloadedViewModel = mainViewModel.downloadedViewModel
     val onGoingViewModel = mainViewModel.onGoingViewModel
 
     BottomSheetScaffold(
-        scaffoldState = volumeBottomSheetScaffoldState,
-        sheetContent = {
+        scaffoldState = volumeBottomSheetScaffoldState, // Estado para el BottomSheet del volumen
+        sheetContent = { // Contenido del BottomSheet (control de volumen)
             VolumeControl(
                 player = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer else mainViewModel.andainaStreamPlayer.exoPlayer,
                 onVolumeChanged = { newVolume ->
@@ -70,96 +72,107 @@ fun NavGraph(
                 },
                 currentVolume = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer.volume else mainViewModel.andainaStreamPlayer.exoPlayer?.volume ?: 0f,
                 onBluetoothDeviceSelected = { deviceName ->
-                    Timber.d("Dispositivo Bluetooth seleccionado: $deviceName (lógica no implementada)")
                     coroutineScope.launch { volumeBottomSheetScaffoldState.bottomSheetState.partialExpand() }
                 }
             )
         },
-        sheetPeekHeight = 0.dp
+        sheetPeekHeight = 0.dp,
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValuesDelBottomSheet ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValuesDelBottomSheet)
+                .background(MaterialTheme.colorScheme.background)
         ) {
+            // NavHost para gestionar la navegación entre pantallas
             NavHost(
                 navController = navController,
-                startDestination = Screen.Home.route,
-                modifier = Modifier.weight(1f)
+                startDestination = Screen.Home.route, // Pantalla inicial
+                modifier = Modifier.weight(1f) // El NavHost ocupa el espacio principal
             ) {
+                // Definición de la pantalla de Inicio (HomeScreen)
                 composable(Screen.Home.route) {
                     HomeScreen(
                         mainViewModel = mainViewModel,
-                        onProgramaSelected = { progId, progNombre -> // HomeScreen debe tener este parámetro
+                        onProgramaSelected = { progId, progNombre ->
+                            // Navega a la pantalla del programa con su ID y nombre
                             navController.navigate(Screen.Programa.createRoute(progId, progNombre))
                         },
-                        onNavigateToSearch = { navController.navigate(Screen.Search.route) }
+                        onNavigateToSearch = { navController.navigate(Screen.Search.route) } // Navega a la pantalla de búsqueda
                     )
                 }
 
+                // Definición de la pantalla de Programa (ProgramaScreen)
                 composable(
-                    route = Screen.Programa.route, // Asegúrate que Screen.Programa está definido en Screen.kt
-                    arguments = listOf(
+                    route = Screen.Programa.route,
+                    arguments = listOf( // Argumentos que espera esta ruta
                         navArgument("programaId") { type = NavType.IntType },
                         navArgument("programaNombre") { type = NavType.StringType }
                     )
                 ) { navBackStackEntry ->
+                    val arguments = navBackStackEntry.arguments
+                    val programaIdFromArgs = arguments?.getInt("programaId") ?: -1 // Obtiene el ID del programa
+
+                    // Crea el ProgramaViewModel con una clave única y el navBackStackEntry como owner
                     val programaViewModel: ProgramaViewModel = viewModel(
-                        viewModelStoreOwner = navBackStackEntry,
+                        key = "programa_vm_$programaIdFromArgs", // Clave única para el ViewModel
+                        viewModelStoreOwner = navBackStackEntry, // Asocia el ViewModel al ciclo de vida de esta entrada de navegación
                         factory = viewModelFactory // Usa la factory global
                     )
-                    val programaNombreArg = navBackStackEntry.arguments?.getString("programaNombre")?.let { Uri.decode(it) }
-                        ?: programaViewModel.programaNombre
 
                     ProgramaScreen(
                         programaViewModel = programaViewModel,
                         mainViewModel = mainViewModel,
                         queueViewModel = queueViewModel,
                         downloadedViewModel = downloadedViewModel,
-                        programaNombreFallback = programaNombreArg,
                         onBackClick = { navController.popBackStack() }
                     )
                 }
 
+                // Definición de la pantalla de Búsqueda (SearchScreen)
                 composable(Screen.Search.route) {
                     SearchScreen(
-                        searchViewModel = searchViewModel, // ViewModel para la lógica de búsqueda
-                        queueViewModel = queueViewModel,   // ViewModel para la lógica de cola
-                        downloadedViewModel = downloadedViewModel, // ViewModel para la lógica de descargas
+                        searchViewModel = searchViewModel,
+                        queueViewModel = queueViewModel,
+                        downloadedViewModel = downloadedViewModel,
                         onEpisodeSelected = { episodio ->
-                            mainViewModel.selectEpisode(episodio)
-                            // ... (lógica de navegación opcional) ...
+                            mainViewModel.selectEpisode(episodio) // Selecciona el episodio para reproducción
                         },
                         onBackClick = { navController.popBackStack() }
                     )
                 }
+                // Definición de la pantalla de Descargas (DownloadedEpisodioScreen)
                 composable(Screen.Downloads.route) {
-                    DownloadedEpisodioScreen( // Tu pantalla renombrada
+                    DownloadedEpisodioScreen(
                         downloadedEpisodioViewModel = downloadedViewModel,
-                        queueViewModel = queueViewModel, // Pasar para EpisodioListItem
+                        queueViewModel = queueViewModel,
                         onEpisodeSelected = { episodio -> mainViewModel.selectEpisode(episodio) },
                         onBackClick = { navController.popBackStack() }
                     )
                 }
+                // Definición de la pantalla de Cola (QueueScreen)
                 composable(Screen.Queue.route) {
                     QueueScreen(
                         queueViewModel = queueViewModel,
-                        downloadedViewModel = downloadedViewModel, // Pasar para EpisodioListItem
+                        downloadedViewModel = downloadedViewModel,
                         onEpisodeSelected = { episodio -> mainViewModel.selectEpisode(episodio) },
                         onBackClick = { navController.popBackStack() }
                     )
                 }
+                // Definición de la pantalla de "Seguir Escuchando" (OnGoingEpisodioScreen)
                 composable(Screen.OnGoing.route) {
-                    OnGoingEpisodioScreen( // Tu pantalla renombrada
+                    OnGoingEpisodioScreen(
                         onGoingEpisodioViewModel = onGoingViewModel,
-                        queueViewModel = queueViewModel, // Pasar para EpisodioListItem
-                        downloadedViewModel = downloadedViewModel, // Pasar para EpisodioListItem
+                        queueViewModel = queueViewModel,
+                        downloadedViewModel = downloadedViewModel,
                         onEpisodeSelected = { episodio -> mainViewModel.selectEpisode(episodio) },
                         onBackClick = { navController.popBackStack() }
                     )
                 }
             }
 
+            // Reproductor de Audio Global
             AudioPlayer(
                 activePlayer = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer else mainViewModel.andainaStreamPlayer.exoPlayer,
                 currentEpisode = currentPlayingEpisode,
@@ -174,10 +187,10 @@ fun NavGraph(
                     Timber.d("Info click para episodio: ${episodio.title}")
                     navController.navigate("episode_detail_screen/${episodio.id}")
                 },
-                onVolumeIconClick = {
+                onVolumeIconClick = { // Acción para mostrar el control de volumen (BottomSheet)
                     coroutineScope.launch {
-                        if (volumeBottomSheetScaffoldState.bottomSheetState.currentValue == SheetValue.Expanded) {
-                            volumeBottomSheetScaffoldState.bottomSheetState.partialExpand()
+                        if (volumeBottomSheetScaffoldState.bottomSheetState.isVisible) {
+                            volumeBottomSheetScaffoldState.bottomSheetState.hide()
                         } else {
                             volumeBottomSheetScaffoldState.bottomSheetState.expand()
                         }
@@ -185,28 +198,33 @@ fun NavGraph(
                 }
             )
 
+            // Barra de Navegación Inferior
             BottomNavigationBar(
                 navController = navController,
-                onSearchClick = {
+                onSearchClick = { // Navega a la pantalla de búsqueda
                     if (navController.currentDestination?.route != Screen.Search.route) {
-                        navController.navigate(Screen.Search.route) { popUpTo(Screen.Home.route) }
+                        navController.navigate(Screen.Search.route) {
+                            popUpTo(Screen.Home.route) { saveState = true }
+                            launchSingleTop = true
+                        }
                     }
                 },
-                onOnGoingClick = { navController.navigate(Screen.OnGoing.route) { launchSingleTop = true; popUpTo(Screen.Home.route) } },
-                onDownloadedClick = { navController.navigate(Screen.Downloads.route) { launchSingleTop = true; popUpTo(Screen.Home.route) } },
-                onQueueClick = { navController.navigate(Screen.Queue.route) { launchSingleTop = true; popUpTo(Screen.Home.route) } },
-                onSettingsClick = { showSettingsDialog = true }
+                onOnGoingClick = { navController.navigate(Screen.OnGoing.route) { popUpTo(Screen.Home.route); launchSingleTop = true } },
+                onDownloadedClick = { navController.navigate(Screen.Downloads.route) { popUpTo(Screen.Home.route); launchSingleTop = true } },
+                onQueueClick = { navController.navigate(Screen.Queue.route) { popUpTo(Screen.Home.route); launchSingleTop = true } },
+                onSettingsClick = { showSettingsDialog = true } // Muestra el diálogo de ajustes
             )
         }
     }
 
+    // Diálogo de Ajustes (si showSettingsDialog es true)
     if (showSettingsDialog) {
         SettingsScreen(
-            onDismissRequest = { showSettingsDialog = false },
+            onDismissRequest = { showSettingsDialog = false }, // Acción para cerrar el diálogo
             isStreamActive = isAndainaStreamActive,
             onStreamActiveChanged = {
-                mainViewModel.toggleAndainaStreamActive()
-                showSettingsDialog = false
+                mainViewModel.toggleAndainaStreamActive() // Cambia el estado del stream
+                showSettingsDialog = false // Cierra el diálogo después del cambio
             }
         )
     }

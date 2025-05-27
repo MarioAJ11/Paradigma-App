@@ -175,6 +175,5 @@ class QueueViewModel(
         Timber.d("Cola de reproducción limpiada.")
     }
 
-    // TODO: Implementar reordenamiento de la cola si es una característica deseada.
-    // fun reorderQueue(from: Int, to: Int) { ... }
+    // TODO: Implementar reordenamiento de la cola
 }

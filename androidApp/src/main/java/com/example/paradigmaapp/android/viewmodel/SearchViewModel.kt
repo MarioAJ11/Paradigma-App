@@ -2,8 +2,8 @@ package com.example.paradigmaapp.android.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.paradigmaapp.model.Episodio
-import com.example.paradigmaapp.repository.WordpressService
+import com.example.paradigmaapp.model.Episodio // Modelo del módulo shared
+import com.example.paradigmaapp.repository.WordpressService // Servicio del módulo shared
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -14,6 +14,7 @@ import timber.log.Timber
 /**
  * ViewModel para la pantalla de búsqueda.
  * Gestiona el estado de la búsqueda, los resultados y la carga.
+ * Ahora filtra los resultados del servidor para que coincidan con la frase exacta en el título.
  *
  * @property wordpressService El servicio para obtener datos de WordPress.
  * @author Mario Alguacil Juárez
@@ -40,9 +41,9 @@ class SearchViewModel(private val wordpressService: WordpressService) : ViewMode
             _searchText
                 .debounce(400) // Espera 400ms después de la última entrada antes de buscar
                 .distinctUntilChanged() // Solo busca si el texto ha cambiado
-                .collectLatest { query -> // collectLatest cancela la búsqueda anterior si llega una nueva query
+                .collectLatest { query ->
                     if (query.length > 2) { // Solo busca si la query tiene al menos 3 caracteres
-                        performSearch(query)
+                        performSearchAndFilter(query)
                     } else {
                         _searchResults.value = emptyList()
                         _isSearching.value = false
@@ -62,30 +63,42 @@ class SearchViewModel(private val wordpressService: WordpressService) : ViewMode
     }
 
     /**
-     * Realiza la búsqueda de episodios.
-     * @param query El término de búsqueda.
+     * Realiza la búsqueda de episodios en el servidor y luego filtra los resultados
+     * para encontrar coincidencias de frase exacta en el título.
+     * @param query El término de búsqueda (la frase).
      */
-    private fun performSearch(query: String) {
-        // collectLatest ya cancela el bloque anterior, pero por si acaso se llama externamente.
+    private fun performSearchAndFilter(query: String) {
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             _isSearching.value = true
             _searchError.value = null
             _searchResults.value = emptyList() // Limpiar resultados anteriores inmediatamente
             try {
-                Timber.d("Realizando búsqueda para: $query")
+                Timber.d("SearchViewModel: Realizando búsqueda en servidor para: $query")
                 // Pequeño delay para que el usuario vea el indicador de carga si la respuesta es muy rápida
-                delay(200)
-                val results = wordpressService.buscarEpisodios(query)
-                _searchResults.value = results
-                Timber.d("Resultados de búsqueda: ${results.size}")
-                if (results.isEmpty()) {
-                    _searchError.value = "No se encontraron resultados para \"$query\"."
+                delay(200) // Opcional, para mejorar UX visual
+
+                // Paso 1: Obtener resultados del servidor (búsqueda general de WordPress)
+                val serverResults = wordpressService.buscarEpisodios(query) //
+                Timber.d("SearchViewModel: Resultados del servidor: ${serverResults.size}")
+
+                // Paso 2: Filtrar en el cliente para frase exacta en el título (ignorando mayúsculas/minúsculas)
+                val filteredResults = serverResults.filter { episodio ->
+                    // episodio.title ya es el título renderizado y decodificado de entidades HTML
+                    episodio.title.contains(query, ignoreCase = true)
                 }
+                Timber.d("SearchViewModel: Resultados filtrados por título (frase exacta): ${filteredResults.size}")
+
+                _searchResults.value = filteredResults
+
+                if (filteredResults.isEmpty()) {
+                    _searchError.value = "No se encontraron episodios con el título \"$query\"."
+                }
+
             } catch (e: Exception) {
-                Timber.e(e, "Error durante la búsqueda para query '$query'")
+                Timber.e(e, "SearchViewModel: Error durante la búsqueda y filtrado para query '$query'")
                 _searchError.value = "Error al realizar la búsqueda. Inténtalo de nuevo."
-                _searchResults.value = emptyList()
+                _searchResults.value = emptyList() // Limpiar en caso de error
             } finally {
                 _isSearching.value = false
             }
@@ -102,6 +115,6 @@ class SearchViewModel(private val wordpressService: WordpressService) : ViewMode
 
     override fun onCleared() {
         super.onCleared()
-        searchJob?.cancel()
+        searchJob?.cancel() // Cancela cualquier trabajo de búsqueda pendiente al limpiar el ViewModel
     }
 }

@@ -32,9 +32,8 @@ val AmarilloOscuroContraste = Color(0xFFC7A200) // Para contenedores primarios e
 val GrisMuyClaro = Color(0xFFF5F5F5)  // casi blanco, para fondos en tema claro
 val GrisClaro = Color(0xFFEEEEEE)    // para variantes de superficie en tema claro
 val GrisMedioClaro = Color(0xFFE0E0E0) // para outlines sutiles en tema claro
-val GrisMedio = Color(0xFFBDBDBD)      // para outlines más definidos en tema claro o texto secundario
-val GrisMedioOscuro = Color(0xFF9E9E9E)  // para texto secundario o variantes de superficie en tema oscuro
-val GrisOscuro = Color(0xFF757575)      // para outlines en tema oscuro
+val GrisMedio = Color(0xFF909090)      // para outlines más definidos en tema claro o texto secundario
+val GrisOscuro = Color(0xFF6C6B6B)      // para outlines en tema oscuro
 val GrisTextoOriginal = Color(0xFF616161) // Tu GrisTextoOscuro, puede ser un color secundario.
 val GrisMuyOscuro = Color(0xFF424242)    // para superficies sutilmente diferenciadas en tema oscuro
 val GrisCasiNegro = Color(0xFF212121)    // para fondos o superficies principales en tema oscuro, alternativa al NegroPuro
@@ -63,7 +62,7 @@ private val DarkColorScheme = darkColorScheme(
     tertiaryContainer = Color(0xFF4A442A),    // Un contenedor terciario oscuro que complementa el amarillo claro.
     onTertiaryContainer = AmarilloPrincipal,  // Texto/iconos sobre 'tertiaryContainer'.
 
-    background = NegroPuro,                   // Fondo principal de la aplicación.
+    background = GrisCasiNegro,                   // Fondo principal de la aplicación.
     onBackground = BlancoPuro,                // Color del texto y los iconos principales sobre 'background'.
 
     surface = GrisCasiNegro,                  // Color de las superficies de componentes como Cards, Sheets, Menus.

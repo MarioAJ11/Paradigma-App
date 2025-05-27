@@ -88,6 +88,7 @@ fun AudioPlayer(
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .background(Color.Transparent)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         colors = CardDefaults.cardColors(containerColor = primaryColor),
         shape = RoundedCornerShape(12.dp) // Esquinas un poco más redondeadas

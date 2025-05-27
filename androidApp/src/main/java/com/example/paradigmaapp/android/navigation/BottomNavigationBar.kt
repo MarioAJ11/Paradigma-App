@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.AccessTimeFilled // Considera camb
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -29,7 +30,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState // <--- IMPORTAN
  */
 @Composable
 fun BottomNavigationBar(
-    navController: NavHostController, // Recibe el NavController
+    navController: NavHostController,
     onSearchClick: () -> Unit,
     onOnGoingClick: () -> Unit,
     onDownloadedClick: () -> Unit,
@@ -43,36 +44,27 @@ fun BottomNavigationBar(
 
     NavigationBar(modifier = modifier) {
         NavigationBarItem(
-            icon = { Icon(Icons.Filled.AccessTimeFilled, contentDescription = "Buscar") }, // Considera Icons.Filled.Search
-            label = { Text("Buscar") },
-            // Comprueba si la ruta actual o alguna de sus rutas padre coincide con Screen.Search.route
+            icon = { Icon(Icons.Filled.Search, contentDescription = "Buscar") },
             selected = currentDestination?.hierarchy?.any { it.route == Screen.Search.route } == true,
             onClick = onSearchClick
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Filled.PlayArrow, contentDescription = "Continuar") },
-            label = { Text("Continuar") },
+            icon = { Icon(Icons.Filled.AccessTimeFilled, contentDescription = "Continuar") },
             selected = currentDestination?.hierarchy?.any { it.route == Screen.OnGoing.route } == true,
             onClick = onOnGoingClick
         )
         NavigationBarItem(
             icon = { Icon(Icons.Filled.Download, contentDescription = "Descargas") },
-            label = { Text("Descargas") },
             selected = currentDestination?.hierarchy?.any { it.route == Screen.Downloads.route } == true,
             onClick = onDownloadedClick
         )
         NavigationBarItem(
             icon = { Icon(Icons.Filled.List, contentDescription = "Cola") },
-            label = { Text("Cola") },
             selected = currentDestination?.hierarchy?.any { it.route == Screen.Queue.route } == true,
             onClick = onQueueClick
         )
         NavigationBarItem(
             icon = { Icon(Icons.Filled.Settings, contentDescription = "Ajustes") },
-            label = { Text("Ajustes") },
-            // El diálogo de Ajustes no suele ser un destino de navegación que se "seleccione" en la barra.
-            // Podrías basar su 'selected' en una variable de estado si `showSettingsDialog` estuviera aquí.
-            // Por ahora, se deja como false.
             selected = false,
             onClick = onSettingsClick
         )

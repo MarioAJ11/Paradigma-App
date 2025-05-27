@@ -57,38 +57,46 @@ class ProgramaViewModel(
      * Carga los detalles del programa y luego sus episodios.
      */
     fun loadProgramaConEpisodios() {
+        if (programaId == -1) {
+            _error.value = "ID de programa no válido para cargar episodios."
+            Timber.e("ProgramaViewModel: Intento de cargar episodios con programaId inválido (-1).")
+            _isLoadingEpisodios.value = false
+            _isLoadingPrograma.value = false
+            return
+        }
+
         viewModelScope.launch {
             _isLoadingPrograma.value = true
             _isLoadingEpisodios.value = true
             _error.value = null
+            Timber.d("ProgramaViewModel: Iniciando carga de programa y episodios para programaId: $programaId, Nombre (pasado): $programaNombre")
+
             try {
-                // Primero, intenta obtener el programa si no lo tenemos.
-                // Si la API de WordPress no tiene un endpoint para obtener un término de taxonomía por ID
-                // directamente con todos sus campos personalizados (como imageUrl),
-                // podríamos necesitar obtenerlo de una lista general o construirlo parcialmente.
-                // WordpressService.getPrograma(programaId) no existe, así que lo construiremos parcialmente.
-                // O mejor, WordpressService.getProgramas() podría usarse para encontrarlo si ya fue cargado.
-                // Por ahora, asumimos que el nombre ya nos llegó y construimos un Programa básico.
-                // Si tu WordpressService tuviera un `getProgramaById`, lo usarías aquí.
-                // Por ahora, como el nombre viene por argumento, lo usamos.
-                // La imagen del programa es un desafío si no hay un endpoint directo.
-                _programa.value = Programa(id = programaId, name = programaNombre, slug = "", description = "Cargando descripción...") // Placeholder
 
-                // Luego carga los episodios
-                val fetchedEpisodios = wordpressService.getEpisodiosPorPrograma(programaId)
+                val todosLosProgramas = wordpressService.getProgramas() // Vuelve a cargar todos los programas
+                val programaActualCompleto = todosLosProgramas.find { it.id == programaId }
+
+                if (programaActualCompleto != null) {
+                    _programa.value = programaActualCompleto // Ahora tiene la descripción real
+                    Timber.d("ProgramaViewModel: Detalles completos del programa (ID: $programaId) cargados, descripción: ${programaActualCompleto.description}")
+                } else {
+                    // Si no se encuentra (raro si el ID es válido), usa el nombre pasado y sin descripción.
+                    _programa.value = Programa(id = programaId, name = programaNombre, slug = "", description = "Descripción no disponible")
+                    Timber.w("ProgramaViewModel: No se encontró el programa completo con ID $programaId en la lista recargada.")
+                }
+                _isLoadingPrograma.value = false
+
+                Timber.d("ProgramaViewModel: Llamando a wordpressService.getEpisodiosPorPrograma con programaId: $programaId y perPage: 30")
+                val fetchedEpisodios = wordpressService.getEpisodiosPorPrograma(programaId = programaId, perPage = 30)
                 _episodios.value = fetchedEpisodios
-                Timber.d("Cargados ${fetchedEpisodios.size} episodios para el programa ID $programaId.")
-
-                // Si tu API de WordPress devuelve la descripción del programa junto con los episodios
-                // o si tienes un endpoint para obtener los detalles del programa, actualiza _programa.value aquí.
-                // Ejemplo: val detallesPrograma = wordpressService.getDetallesPrograma(programaId)
-                // _programa.value = detallesPrograma
+                Timber.d("ProgramaViewModel: Recibidos ${fetchedEpisodios.size} episodios para el programa ID $programaId.")
 
             } catch (e: Exception) {
-                Timber.e(e, "Error cargando programa (ID: $programaId) y sus episodios.")
-                _error.value = "No se pudo cargar la información del programa."
+                Timber.e(e, "ProgramaViewModel: Error cargando programa (ID: $programaId) y/o sus episodios.")
+                _error.value = "No se pudo cargar la información del programa o episodios."
+                _episodios.value = emptyList()
+                _isLoadingPrograma.value = false // Asegurarse de resetear en error
             } finally {
-                _isLoadingPrograma.value = false // Asumimos que la info básica del programa se cargó o se construyó
                 _isLoadingEpisodios.value = false
             }
         }
