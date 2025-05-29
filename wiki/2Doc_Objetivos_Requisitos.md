@@ -1,0 +1,1 @@
+_Descripción detallada del problema. Indicación de todas las características que debe tener la solución._

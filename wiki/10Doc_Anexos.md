@@ -1,0 +1,1 @@
+_Por ejemplo, planos, especificaciones de los programas que se usen..._
