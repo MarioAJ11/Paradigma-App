@@ -156,7 +156,7 @@ class OnGoingEpisodioViewModel(
         if (savedPosition > 0) {
             // No tenemos la duración total aquí si solo tenemos la posición guardada.
             // Devolvemos (savedPosition, 0L) para indicar duración desconocida.
-            // La UI debería poder manejar una duración de 0L (ej. mostrar solo progreso como porcentaje si es posible, o solo la posición).
+            // La UI debería poder manejar una duración de 0L
             return Pair(savedPosition, 0L)
         }
         return null // No hay información de progreso.

@@ -1,19 +1,18 @@
-package com.example.paradigmaapp.android.navigation // O com.example.paradigmaapp.android.ui
+package com.example.paradigmaapp.android.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTimeFilled // Considera cambiar este ícono por uno de búsqueda (Search)
+import androidx.compose.material.icons.filled.AccessTimeFilled
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue // <--- IMPORTANTE: Añadir esta importación
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavDestination.Companion.hierarchy // <--- IMPORTANTE: Para jerarquía de destinos
+import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.currentBackStackEntryAsState // <--- IMPORTANTE: Para observar la pila de navegación
+import androidx.navigation.compose.currentBackStackEntryAsState
 
 /**
  * Composable para la barra de navegación inferior de la aplicación.

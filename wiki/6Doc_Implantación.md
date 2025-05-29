@@ -1,1 +1,0 @@
-_Pasos necesarios para instalar la solución. (Si tiene un manual desarrollado, enlaza aquí al manual en la wiki)_

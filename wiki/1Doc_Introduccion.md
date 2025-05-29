@@ -1,1 +1,0 @@
-_Breve introducción al problema propuesto._

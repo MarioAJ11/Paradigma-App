@@ -99,7 +99,6 @@ fun NavGraph(
                             // Navega a la pantalla del programa con su ID y nombre
                             navController.navigate(Screen.Programa.createRoute(progId, progNombre))
                         },
-                        onNavigateToSearch = { navController.navigate(Screen.Search.route) } // Navega a la pantalla de búsqueda
                     )
                 }
 

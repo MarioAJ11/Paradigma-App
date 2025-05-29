@@ -1,1 +1,0 @@
-_Todos los libros, páginas web y documentos en general empleados para el desarrollo._

@@ -120,7 +120,7 @@ class WordpressService {
         return try {
             val episodios: List<Episodio> = ktorClient.get("$baseUrl/posts") {
                 parameter("search", searchTerm)
-                parameter("per_page", 50) // Limita el número de resultados de búsqueda
+                parameter("per_page", 100) // Limita el número de resultados de búsqueda
                 parameter("_embed", "wp:featuredmedia,wp:term")
             }.body()
             println("WordpressService: Encontrados ${episodios.size} episodios para búsqueda '$searchTerm'.")

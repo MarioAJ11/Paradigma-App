@@ -19,8 +19,7 @@ import com.example.paradigmaapp.model.Programa
 @Composable
 fun HomeScreen(
     mainViewModel: MainViewModel,
-    onProgramaSelected: (programaId: Int, programaNombre: String) -> Unit,
-    onNavigateToSearch: () -> Unit // Mantienes esto si la search icon está en otro lado
+    onProgramaSelected: (programaId: Int, programaNombre: String) -> Unit
 ) {
     val programas: List<Programa> by mainViewModel.programas.collectAsState()
     val isLoadingProgramas: Boolean by mainViewModel.isLoadingProgramas.collectAsState()

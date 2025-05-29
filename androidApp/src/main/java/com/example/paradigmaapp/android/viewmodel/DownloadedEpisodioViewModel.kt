@@ -172,7 +172,6 @@ class DownloadedEpisodioViewModel(
                 }
             } else {
                 Timber.w("El archivo a eliminar no existía: ${file.absolutePath}")
-                // Consideramos que la "eliminación" fue exitosa en términos de estado si el archivo no está.
                 fileWasDeleted = true
             }
 
@@ -181,7 +180,6 @@ class DownloadedEpisodioViewModel(
                 saveDownloadedState()
                 _downloadedEpisodios.value = _downloadedEpisodios.value.filterNot { it.id == episodio.id }
                 Timber.d("Episodio '${episodio.title}' eliminado de la lista de descargas.")
-                // Puedes enviar un mensaje a la UI aquí también si lo deseas.
             }
         }
     }
@@ -204,9 +202,6 @@ class DownloadedEpisodioViewModel(
             if (file.exists()) file.absolutePath else null
         } else {
             Timber.w("No se pudo encontrar el slug para el episodio ID $episodeId al buscar ruta de archivo.")
-            // Como fallback, si no tenemos el slug, no podemos construir el nombre de archivo exacto.
-            // Una alternativa sería buscar en el directorio un archivo que empiece por "{episodeId}_"
-            // pero eso es más complejo y propenso a errores si el formato del nombre cambia.
             null
         }
     }

@@ -8,8 +8,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.paradigmaapp.android.Theme // Importa tu tema para el preview
 
 /**
  * Composable que muestra un diálogo simple para ajustes, ahora con un enlace a la web y control de streaming.

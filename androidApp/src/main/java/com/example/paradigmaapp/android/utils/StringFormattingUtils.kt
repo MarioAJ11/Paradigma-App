@@ -24,7 +24,7 @@ fun String.unescapeHtmlEntities(): String {
         .replace("&#171;", "«")  // Comillas angulares izquierdas (laquo)
         .replace("&#187;", "»")  // Comillas angulares derechas (raquo)
         .replace("&nbsp;", " ") // Espacio de no ruptura
-    // Puedes añadir más reemplazos comunes si los encuentras en tu contenido.
+    // En caso necesario de necesario añadir más se podría
 }
 
 /**

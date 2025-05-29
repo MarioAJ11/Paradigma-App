@@ -45,7 +45,7 @@ fun DownloadedEpisodioScreen(
     // Observa los IDs de los episodios en cola para el estado en EpisodioListItem.
     val queueEpisodeIds by queueViewModel.queueEpisodeIds.collectAsState()
 
-    // Para el Snackbar, para mostrar mensajes (ej. "Episodio ya descargado")
+    // Para el Snackbar, para mostrar mensajes
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -78,7 +78,7 @@ fun DownloadedEpisodioScreen(
     ) { innerPadding -> // Padding proporcionado por el Scaffold
         Column(
             modifier = Modifier
-                .fillMaxSize() // Ocupa todo el espacio disponible
+                .fillMaxSize()
                 .padding(innerPadding) // Aplica el padding del Scaffold
                 .background(MaterialTheme.colorScheme.background) // Color de fondo de la pantalla
         ) {
