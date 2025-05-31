@@ -41,7 +41,8 @@ fun OnGoingEpisodioScreen(
     onGoingEpisodioViewModel: OnGoingEpisodioViewModel,
     queueViewModel: QueueViewModel,
     downloadedViewModel: DownloadedEpisodioViewModel,
-    onEpisodeSelected: (Episodio) -> Unit, // Acción de reproducir
+    onEpisodeSelected: (Episodio) -> Unit,
+    onEpisodeLongClicked: (Episodio) -> Unit,
     onBackClick: () -> Unit
 ) {
     // Observa los estados desde los ViewModels
@@ -106,7 +107,8 @@ fun OnGoingEpisodioScreen(
                     items(onGoingEpisodios, key = { episodio -> episodio.id }) { episodio ->
                         EpisodioListItem(
                             episodio = episodio,
-                            onPlayEpisode = { onEpisodeSelected(it) }, // Acción de reproducir
+                            onPlayEpisode = { onEpisodeSelected(it) },
+                            onEpisodeLongClick = { onEpisodeLongClicked(it) },
                             onAddToQueue = { queueViewModel.addEpisodeToQueue(it) },
                             onRemoveFromQueue = { queueViewModel.removeEpisodeFromQueue(it) },
                             onDownloadEpisode = { ep, onMsgCallback ->

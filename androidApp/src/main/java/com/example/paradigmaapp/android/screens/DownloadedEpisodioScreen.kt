@@ -37,7 +37,8 @@ import kotlinx.coroutines.launch
 fun DownloadedEpisodioScreen(
     downloadedEpisodioViewModel: DownloadedEpisodioViewModel,
     queueViewModel: QueueViewModel,
-    onEpisodeSelected: (Episodio) -> Unit, // Acción de reproducir, se pasará a onPlayEpisode
+    onEpisodeSelected: (Episodio) -> Unit,
+    onEpisodeLongClicked: (Episodio) -> Unit,
     onBackClick: () -> Unit
 ) {
     // Observa la lista de episodios descargados desde el ViewModel.
@@ -105,6 +106,7 @@ fun DownloadedEpisodioScreen(
                         // Cada item de la lista es un EpisodioListItem.
                         EpisodioListItem(
                             episodio = episodio,
+                            onEpisodeLongClick = { onEpisodeLongClicked(it) },
                             onPlayEpisode = { onEpisodeSelected(it) }, // Acción de reproducir al hacer clic
                             onAddToQueue = { queueViewModel.addEpisodeToQueue(it) }, // Añadir a la cola
                             onRemoveFromQueue = { queueViewModel.removeEpisodeFromQueue(it) }, // Quitar de la cola

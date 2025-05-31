@@ -38,7 +38,8 @@ import kotlinx.coroutines.launch
 fun QueueScreen(
     queueViewModel: QueueViewModel,
     downloadedViewModel: DownloadedEpisodioViewModel,
-    onEpisodeSelected: (Episodio) -> Unit, // Acción de reproducir
+    onEpisodeSelected: (Episodio) -> Unit,
+    onEpisodeLongClicked: (Episodio) -> Unit,
     onBackClick: () -> Unit
 ) {
     val queueEpisodios by queueViewModel.queueEpisodios.collectAsState()
@@ -100,7 +101,8 @@ fun QueueScreen(
                     items(queueEpisodios, key = { it.id }) { episodio ->
                         EpisodioListItem(
                             episodio = episodio,
-                            onPlayEpisode = { onEpisodeSelected(it) }, // Acción de reproducir
+                            onPlayEpisode = { onEpisodeSelected(it) },
+                            onEpisodeLongClick = { onEpisodeLongClicked(it) },
                             onAddToQueue = { /* Ya está en cola, no se necesita esta acción específica aquí o podría ser para reordenar */ },
                             onRemoveFromQueue = { queueViewModel.removeEpisodeFromQueue(it) },
                             onDownloadEpisode = { ep, onMsgCallback ->

@@ -2,11 +2,6 @@ package com.example.paradigmaapp.android.navigation
 
 import android.net.Uri
 
-/**
- * Define las diferentes pantallas (rutas) en la aplicación para la navegación.
- * Cada objeto representa un destino navegable.
- * @author Mario Alguacil Juárez
- */
 sealed class Screen(val route: String) {
     object Home : Screen("home_screen")
     object Search : Screen("search_screen")
@@ -17,6 +12,12 @@ sealed class Screen(val route: String) {
         fun createRoute(programaId: Int, programaNombre: String): String {
             val encodedNombre = Uri.encode(programaNombre)
             return "programa_screen/$programaId/$encodedNombre"
+        }
+    }
+    // Nueva pantalla de detalle de episodio
+    object EpisodeDetail : Screen("episode_detail_screen/{episodeId}") {
+        fun createRoute(episodeId: Int): String {
+            return "episode_detail_screen/$episodeId"
         }
     }
 }

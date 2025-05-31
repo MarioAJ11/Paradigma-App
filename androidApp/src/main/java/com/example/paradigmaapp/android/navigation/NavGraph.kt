@@ -35,7 +35,7 @@ import timber.log.Timber
 @Composable
 fun NavGraph(
     navController: NavHostController = rememberNavController(),
-    viewModelFactory: ViewModelFactory, // Factory para crear ViewModels
+    viewModelFactory: ViewModelFactory,
     mainViewModel: MainViewModel,
     searchViewModel: SearchViewModel
 ) {
@@ -59,37 +59,31 @@ fun NavGraph(
     val onGoingViewModel = mainViewModel.onGoingViewModel
 
     BottomSheetScaffold(
-        scaffoldState = volumeBottomSheetScaffoldState, // Estado para el BottomSheet del volumen
-        sheetContent = { // Contenido del BottomSheet (control de volumen)
+        scaffoldState = volumeBottomSheetScaffoldState,
+        sheetContent = {
             VolumeControl(
-                player = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer else mainViewModel.andainaStreamPlayer.exoPlayer,
                 onVolumeChanged = { newVolume ->
-                    if (currentPlayingEpisode != null) {
-                        mainViewModel.podcastExoPlayer.volume = newVolume
-                    } else {
-                        mainViewModel.andainaStreamPlayer.exoPlayer?.volume = newVolume
+                    val activePlayer = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer else mainViewModel.andainaStreamPlayer.exoPlayer
+                    activePlayer?.let { player ->
+                        player.volume = newVolume.coerceIn(0f, 1f)
                     }
                 },
-                currentVolume = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer.volume else mainViewModel.andainaStreamPlayer.exoPlayer?.volume ?: 0f,
-                onBluetoothDeviceSelected = { deviceName ->
-                    coroutineScope.launch { volumeBottomSheetScaffoldState.bottomSheetState.partialExpand() }
-                }
+                currentVolume = (if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer.volume else mainViewModel.andainaStreamPlayer.exoPlayer?.volume ?: 0f)
             )
         },
         sheetPeekHeight = 0.dp,
         containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValuesDelBottomSheet ->
+    )  { paddingValuesDelBottomSheet ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValuesDelBottomSheet)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // NavHost para gestionar la navegación entre pantallas
             NavHost(
                 navController = navController,
-                startDestination = Screen.Home.route, // Pantalla inicial
-                modifier = Modifier.weight(1f) // El NavHost ocupa el espacio principal
+                startDestination = Screen.Home.route,
+                modifier = Modifier.weight(1f)
             ) {
                 // Definición de la pantalla de Inicio (HomeScreen)
                 composable(Screen.Home.route) {
@@ -125,6 +119,9 @@ fun NavGraph(
                         mainViewModel = mainViewModel,
                         queueViewModel = queueViewModel,
                         downloadedViewModel = downloadedViewModel,
+                        onEpisodeLongClicked = { episodio ->
+                            navController.navigate(Screen.EpisodeDetail.createRoute(episodio.id))
+                        },
                         onBackClick = { navController.popBackStack() }
                     )
                 }
@@ -136,7 +133,10 @@ fun NavGraph(
                         queueViewModel = queueViewModel,
                         downloadedViewModel = downloadedViewModel,
                         onEpisodeSelected = { episodio ->
-                            mainViewModel.selectEpisode(episodio) // Selecciona el episodio para reproducción
+                            mainViewModel.selectEpisode(episodio)
+                        },
+                        onEpisodeLongClicked = { episodio ->
+                            navController.navigate(Screen.EpisodeDetail.createRoute(episodio.id))
                         },
                         onBackClick = { navController.popBackStack() }
                     )
@@ -146,6 +146,9 @@ fun NavGraph(
                     DownloadedEpisodioScreen(
                         downloadedEpisodioViewModel = downloadedViewModel,
                         queueViewModel = queueViewModel,
+                        onEpisodeLongClicked = { episodio ->
+                            navController.navigate(Screen.EpisodeDetail.createRoute(episodio.id))
+                        },
                         onEpisodeSelected = { episodio -> mainViewModel.selectEpisode(episodio) },
                         onBackClick = { navController.popBackStack() }
                     )
@@ -155,6 +158,9 @@ fun NavGraph(
                     QueueScreen(
                         queueViewModel = queueViewModel,
                         downloadedViewModel = downloadedViewModel,
+                        onEpisodeLongClicked = { episodio ->
+                            navController.navigate(Screen.EpisodeDetail.createRoute(episodio.id))
+                        },
                         onEpisodeSelected = { episodio -> mainViewModel.selectEpisode(episodio) },
                         onBackClick = { navController.popBackStack() }
                     )
@@ -165,7 +171,31 @@ fun NavGraph(
                         onGoingEpisodioViewModel = onGoingViewModel,
                         queueViewModel = queueViewModel,
                         downloadedViewModel = downloadedViewModel,
+                        onEpisodeLongClicked = { episodio ->
+                            navController.navigate(Screen.EpisodeDetail.createRoute(episodio.id))
+                        },
                         onEpisodeSelected = { episodio -> mainViewModel.selectEpisode(episodio) },
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
+                // Definición de la pantalla de Detalles del Episodio (EpisodeDetailScreen)
+                composable(
+                    route = Screen.EpisodeDetail.route,
+                    arguments = listOf(
+                        navArgument("episodeId") { type = NavType.IntType }
+                    )
+                ) { navBackStackEntry ->
+                    val episodeDetailViewModel: EpisodeDetailViewModel = viewModel(
+                        key = "episode_detail_vm_${navBackStackEntry.arguments?.getInt("episodeId")}",
+                        viewModelStoreOwner = navBackStackEntry,
+                        factory = viewModelFactory
+                    )
+                    EpisodeDetailScreen(
+                        episodeDetailViewModel = episodeDetailViewModel,
+                        mainViewModel = mainViewModel,
+                        queueViewModel = queueViewModel,
+                        downloadedViewModel = downloadedViewModel,
                         onBackClick = { navController.popBackStack() }
                     )
                 }

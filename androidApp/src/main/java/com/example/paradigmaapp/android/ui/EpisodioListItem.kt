@@ -11,39 +11,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.paradigmaapp.android.R // Asegúrate que R se importa correctamente
-import com.example.paradigmaapp.model.Episodio // El modelo de Episodio del módulo shared
+import com.example.paradigmaapp.android.R
+import com.example.paradigmaapp.model.Episodio
 import timber.log.Timber
 
-/**
- * Composable que representa un elemento individual en una lista de episodios.
- * Muestra la carátula, título y duración del episodio.
- * Permite reproducir con un clic y mostrar opciones con una pulsación larga o clic en el icono de menú.
- *
- * @param episodio El [Episodio] que se va a mostrar.
- * @param onPlayEpisode Lambda que se invoca con un clic normal para reproducir el episodio.
- * @param onAddToQueue Lambda para añadir el episodio a la cola (usado por el menú).
- * @param onRemoveFromQueue Lambda para eliminar el episodio de la cola (usado por el menú).
- * @param onDownloadEpisode Lambda para descargar el episodio (usado por el menú). Recibe el episodio y un callback para mensajes.
- * @param onDeleteDownload Lambda para eliminar un episodio descargado (usado por el menú).
- * @param isDownloaded Booleano que indica si el episodio está descargado.
- * @param isInQueue Booleano que indica si el episodio está en la cola.
- * @param modifier Modificador opcional para aplicar a este Composable.
- *
- * @author Mario Alguacil Juárez
- */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class) // ExperimentalMaterial3Api para componentes como Card
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun EpisodioListItem(
     episodio: Episodio,
-    onPlayEpisode: (Episodio) -> Unit, // Para el clic normal (reproducir)
-    // onShowOptionsMenu ya no es un parámetro; el menú se maneja internamente
+    onPlayEpisode: (Episodio) -> Unit,
+    onEpisodeLongClick: (Episodio) -> Unit, // Nueva lambda para pulsación larga
+    // onShowOptionsMenu ya no es un parámetro; el menú se maneja internamente por el IconButton
     onAddToQueue: (Episodio) -> Unit,
     onRemoveFromQueue: (Episodio) -> Unit,
     onDownloadEpisode: (Episodio, (String) -> Unit) -> Unit,
@@ -52,8 +35,7 @@ fun EpisodioListItem(
     isInQueue: Boolean,
     modifier: Modifier = Modifier
 ) {
-    // Estado para controlar la visibilidad del menú desplegable interno
-    var showMenuState by remember { mutableStateOf(false) }
+    var showContextMenu by remember { mutableStateOf(false) } // Renombrado para claridad
 
     Card(
         modifier = modifier
@@ -61,114 +43,103 @@ fun EpisodioListItem(
             .clip(RoundedCornerShape(12.dp))
             .combinedClickable(
                 onClick = { onPlayEpisode(episodio) },
-                onLongClick = { showMenuState = true }
+                onLongClick = { onEpisodeLongClick(episodio) } // Acción para pulsación larga
             ),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically // Alinea verticalmente los elementos del Row
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Imagen del episodio
             AsyncImage(
-                model = episodio.imageUrl, // URL de la imagen del episodio
-                contentDescription = "Portada de ${episodio.title}", // Descripción para accesibilidad
+                model = episodio.imageUrl,
+                contentDescription = "Portada de ${episodio.title}",
                 modifier = Modifier
-                    .padding(0.dp) // Padding a la izquierda de la imagen para separarla del borde de la Card
-                    .size(64.dp) // Tamaño de la imagen
-                    .clip(RoundedCornerShape(8.dp)), // Esquinas redondeadas para la propia imagen
-                contentScale = ContentScale.Crop, // Cómo se escala la imagen para llenar el tamaño
-                error = painterResource(R.mipmap.logo_foreground), // Imagen a mostrar en caso de error de carga
-                placeholder = painterResource(R.mipmap.logo_foreground) // Imagen a mostrar mientras carga la real
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop,
+                error = painterResource(R.mipmap.logo_foreground),
+                placeholder = painterResource(R.mipmap.logo_foreground)
             )
 
-            // Espacio horizontal entre la imagen y la columna de texto
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Columna para el Título y la Duración del episodio
             Column(
-                modifier = Modifier.weight(1f)
-                    .padding(vertical = 10.dp), // La columna toma el espacio restante horizontalmente
-                verticalArrangement = Arrangement.spacedBy(4.dp) // Espacio vertical entre el título y la duración
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = episodio.title, // Título del episodio
-                    style = MaterialTheme.typography.titleMedium, // Estilo del texto del título
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, // Color del texto del título
+                    text = episodio.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
-                    overflow = TextOverflow.Clip
+                    overflow = TextOverflow.Ellipsis // Cambiado a Ellipsis para mejor visualización
                 )
-                // Muestra la duración si está disponible y no es el placeholder
                 if (episodio.duration.isNotBlank() && episodio.duration != "--:--") {
                     Text(
-                        text = episodio.duration, // Duración del episodio
-                        style = MaterialTheme.typography.bodySmall, // Estilo del texto de la duración
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), // Color más tenue para la duración
-                        maxLines = 1 // Máximo una línea para la duración
+                        text = episodio.duration,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 1
                     )
                 }
             }
 
-            // Contenedor para el icono de menú y el menú desplegable
+            // IconButton para mostrar el menú de opciones rápidas
             Box(
                 modifier = Modifier
-                    .align(Alignment.CenterVertically) // Alinea el Box verticalmente dentro del Row
-                    // Padding a la derecha del icono para separarlo del borde de la Card
-                    .padding(end = 8.dp)
+                    .align(Alignment.CenterVertically)
+                    .padding(end = 0.dp) // Ajustar si es necesario
             ) {
-                // IconButton para mostrar el menú de opciones
-                IconButton(onClick = { showMenuState = true }) { // Al hacer clic en el icono, se muestra el menú
+                IconButton(onClick = { showContextMenu = true }) {
                     Icon(
-                        Icons.Filled.MoreVert, // Icono estándar de "más opciones"
-                        contentDescription = "Opciones para ${episodio.title}", // Descripción para accesibilidad
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant // Color del icono
+                        Icons.Filled.MoreVert,
+                        contentDescription = "Opciones para ${episodio.title}",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                // Menú desplegable de opciones
                 DropdownMenu(
-                    expanded = showMenuState, // Su visibilidad depende del estado showMenuState
-                    onDismissRequest = { showMenuState = false } // Acción para cerrar el menú (clic fuera)
+                    expanded = showContextMenu,
+                    onDismissRequest = { showContextMenu = false }
                 ) {
-                    // Opción para Descargar o Eliminar descarga
                     if (isDownloaded) {
                         DropdownMenuItem(
                             text = { Text("Eliminar descarga") },
                             onClick = {
-                                onDeleteDownload(episodio) // Llama a la acción de eliminar descarga
-                                showMenuState = false // Cierra el menú
+                                onDeleteDownload(episodio)
+                                showContextMenu = false
                             }
                         )
                     } else {
                         DropdownMenuItem(
                             text = { Text("Descargar") },
                             onClick = {
-                                onDownloadEpisode(episodio) { message -> // Llama a la acción de descargar
-                                    // El mensaje de feedback (ej. Snackbar) se debe manejar en la pantalla contenedora
+                                onDownloadEpisode(episodio) { message ->
                                     Timber.d("EpisodioListItem: Mensaje de descarga: $message")
                                 }
-                                showMenuState = false // Cierra el menú
+                                showContextMenu = false
                             }
                         )
                     }
 
-                    // Opción para Añadir a cola o Eliminar de cola
                     if (isInQueue) {
                         DropdownMenuItem(
                             text = { Text("Eliminar de cola") },
                             onClick = {
-                                onRemoveFromQueue(episodio) // Llama a la acción de eliminar de la cola
-                                showMenuState = false // Cierra el menú
+                                onRemoveFromQueue(episodio)
+                                showContextMenu = false
                             }
                         )
                     } else {
                         DropdownMenuItem(
                             text = { Text("Añadir a cola") },
                             onClick = {
-                                onAddToQueue(episodio) // Llama a la acción de añadir a la cola
-                                showMenuState = false // Cierra el menú
+                                onAddToQueue(episodio)
+                                showContextMenu = false
                             }
                         )
                     }
