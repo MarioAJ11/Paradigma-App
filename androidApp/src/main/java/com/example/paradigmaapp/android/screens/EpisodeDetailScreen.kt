@@ -145,7 +145,7 @@ fun EpisodeDetailScreen(
                         if (programasAsociados.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Programa(s): ${programasAsociados.joinToString { it.name.unescapeHtmlEntities() }}",
+                                text = "Programa: ${programasAsociados.joinToString { it.name.unescapeHtmlEntities() }}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
@@ -211,7 +211,6 @@ fun EpisodeDetailScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // --- MODIFICACIÓN CLAVE AQUÍ ---
                         val episodioApiContent = ep.content // El HTML completo del contenido del episodio
                         val episodioApiExcerpt = ep.excerpt // El HTML del extracto
 
@@ -240,7 +239,6 @@ fun EpisodeDetailScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        // --- FIN DE LA MODIFICACIÓN CLAVE ---
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 }

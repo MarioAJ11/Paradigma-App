@@ -7,49 +7,70 @@ import com.example.paradigmaapp.exception.NoInternetException
 import com.example.paradigmaapp.exception.ServerErrorException
 import com.example.paradigmaapp.model.Episodio
 import com.example.paradigmaapp.model.Programa
-import com.example.paradigmaapp.repository.WordpressService
+import com.example.paradigmaapp.repository.contracts.EpisodioRepository // Usar la interfaz
+import com.example.paradigmaapp.repository.contracts.ProgramaRepository // Usar la interfaz
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import timber.log.Timber
 
+/**
+ * ViewModel para mi pantalla que muestra los detalles de un programa específico
+ * y la lista de sus episodios asociados. Utilizo [SavedStateHandle] para
+ * recibir el ID y nombre del programa pasados a través de la navegación.
+ *
+ * @author Mario Alguacil Juárez
+ */
 class ProgramaViewModel(
-    private val wordpressService: WordpressService,
-    private val savedStateHandle: SavedStateHandle
+    // Ahora dependo de las abstracciones del repositorio.
+    private val programaRepository: ProgramaRepository,
+    private val episodioRepository: EpisodioRepository,
+    private val savedStateHandle: SavedStateHandle // Para acceder a los argumentos de navegación.
 ) : ViewModel() {
 
+    // Obtengo el ID y el nombre del programa desde los argumentos pasados por navegación.
+    // Si no se encuentran, uso valores por defecto o de error.
     val programaId: Int = savedStateHandle.get<Int>("programaId") ?: -1
-    val programaNombre: String = savedStateHandle.get<String>("programaNombre") ?: "Programa"
+    val programaNombre: String = savedStateHandle.get<String>("programaNombre") ?: "Programa Desconocido"
 
+    // Estado para el objeto Programa actual (con sus detalles).
     private val _programa = MutableStateFlow<Programa?>(null)
     val programa: StateFlow<Programa?> = _programa.asStateFlow()
 
+    // Estado para la lista de episodios del programa actual.
     private val _episodios = MutableStateFlow<List<Episodio>>(emptyList())
     val episodios: StateFlow<List<Episodio>> = _episodios.asStateFlow()
 
+    // Indica si se están cargando los detalles del programa.
     private val _isLoadingPrograma = MutableStateFlow(false)
     val isLoadingPrograma: StateFlow<Boolean> = _isLoadingPrograma.asStateFlow()
 
+    // Indica si se está cargando la lista de episodios del programa.
     private val _isLoadingEpisodios = MutableStateFlow(false)
     val isLoadingEpisodios: StateFlow<Boolean> = _isLoadingEpisodios.asStateFlow()
 
-    private val _error = MutableStateFlow<String?>(null) // Mensaje de error genérico para la UI
+    // Almacena mensajes de error que pueden ocurrir durante la carga de datos.
+    private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
     init {
+        // Si el programaId es válido, inicio la carga de los detalles del programa y sus episodios.
         if (programaId != -1) {
             loadProgramaConEpisodios()
         } else {
+            // Si el ID no es válido, establezco un error inmediatamente.
             _error.value = "ID de programa no válido."
-            Timber.e("ProgramaViewModel inicializado con programaId inválido.")
         }
     }
 
+    /**
+     * Carga los detalles del programa actual (usando [programaId]) y luego
+     * la lista de sus episodios asociados. Gestiona los estados de carga y error.
+     */
     fun loadProgramaConEpisodios() {
         if (programaId == -1) {
+            // Doble verificación, aunque init ya lo hace, por si se llama externamente.
             _error.value = "ID de programa no válido para cargar episodios."
-            Timber.e("ProgramaViewModel: Intento de cargar episodios con programaId inválido (-1).")
             _isLoadingEpisodios.value = false
             _isLoadingPrograma.value = false
             return
@@ -58,43 +79,41 @@ class ProgramaViewModel(
         viewModelScope.launch {
             _isLoadingPrograma.value = true
             _isLoadingEpisodios.value = true
-            _error.value = null // Limpiar error anterior
-            Timber.d("ProgramaViewModel: Iniciando carga de programa y episodios para programaId: $programaId, Nombre (pasado): $programaNombre")
+            _error.value = null // Limpio errores anteriores al iniciar una nueva carga.
 
             try {
-                val todosLosProgramas = wordpressService.getProgramas()
+                // Obtengo todos los programas para encontrar el actual con todos sus detalles
+                // (esto podría optimizarse si tuviera un endpoint para un solo programa por ID con toda su info).
+                val todosLosProgramas = programaRepository.getProgramas()
                 val programaActualCompleto = todosLosProgramas.find { it.id == programaId }
 
                 if (programaActualCompleto != null) {
-                    _programa.value = programaActualCompleto
-                    Timber.d("ProgramaViewModel: Detalles completos del programa (ID: $programaId) cargados.")
+                    _programa.value = programaActualCompleto // Programa encontrado y asignado.
                 } else {
+                    // Si no se encuentra el programa (raro si el ID es válido),
+                    // uso un objeto Programa de fallback con el nombre pasado y una descripción genérica.
+                    // Considero si esto debería ser un error más fuerte.
                     _programa.value = Programa(id = programaId, name = programaNombre, slug = "", description = "Descripción no disponible")
-                    Timber.w("ProgramaViewModel: No se encontró el programa completo con ID $programaId.")
-                    // Considera establecer un error aquí si el programa DEBERÍA existir.
-                    // _error.value = "No se pudo encontrar la información del programa."
+                    // _error.value = "No se pudo encontrar la información completa del programa." // Opcional
                 }
-                _isLoadingPrograma.value = false // Programa cargado o fallback asignado
+                _isLoadingPrograma.value = false // Termina la carga de detalles del programa.
 
-                Timber.d("ProgramaViewModel: Llamando a wordpressService.getEpisodiosPorPrograma con programaId: $programaId")
-                val fetchedEpisodios = wordpressService.getEpisodiosPorPrograma(programaId = programaId, perPage = 30)
+                // Ahora cargo los episodios para este programa.
+                val fetchedEpisodios = episodioRepository.getEpisodiosPorPrograma(programaId = programaId, perPage = 30)
                 _episodios.value = fetchedEpisodios
-                Timber.d("ProgramaViewModel: Recibidos ${fetchedEpisodios.size} episodios para el programa ID $programaId.")
 
             } catch (e: NoInternetException) {
-                Timber.e(e, "ProgramaViewModel: Error de red cargando programa (ID: $programaId) y/o sus episodios.")
                 _error.value = e.message ?: "Sin conexión a internet."
-                _episodios.value = emptyList()
+                _episodios.value = emptyList() // Limpio episodios en caso de error.
             } catch (e: ServerErrorException) {
-                Timber.e(e, "ProgramaViewModel: Error de servidor cargando programa (ID: $programaId) y/o sus episodios.")
                 _error.value = e.userFriendlyMessage
                 _episodios.value = emptyList()
             } catch (e: Exception) {
-                Timber.e(e, "ProgramaViewModel: Error inesperado cargando programa (ID: $programaId) y/o sus episodios.")
                 _error.value = "No se pudo cargar la información del programa o episodios."
                 _episodios.value = emptyList()
             } finally {
-                _isLoadingPrograma.value = false // Asegurar que se resetea incluso si solo fallan los episodios
+                // Aseguro que los indicadores de carga se desactiven.
+                _isLoadingPrograma.value = false
                 _isLoadingEpisodios.value = false
             }
         }

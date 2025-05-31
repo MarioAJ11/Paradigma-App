@@ -1,86 +1,121 @@
-package com.example.paradigmaapp.android.ui // O tu paquete preferido para componentes UI
+package com.example.paradigmaapp.android.ui
 
-import android.util.Log
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.paradigmaapp.android.R // Tus recursos
-import com.example.paradigmaapp.android.utils.imageUrlFromDescription // Para extraer la URL de la imagen
-import com.example.paradigmaapp.android.utils.unescapeHtmlEntities // Para limpiar el nombre
-import com.example.paradigmaapp.model.Programa // Tu modelo de datos Programa
+import com.example.paradigmaapp.android.R
+import com.example.paradigmaapp.android.utils.unescapeHtmlEntities
+import com.example.paradigmaapp.model.Programa
 
 /**
- * Composable para mostrar un item de programa en un formato de cuadrícula (imagen arriba, título abajo).
- * Diseñado para ser usado en LazyVerticalGrid en HomeScreen.
+ * Composable para mostrar un ítem de programa en mi cuadrícula.
+ * Muestra una imagen del programa y su título debajo.
+ * Está diseñado para tener una altura consistente en la sección del título,
+ * basándose en un número máximo de líneas predefinido (actualmente 2).
  *
- * @param programa El objeto [Programa] a mostrar.
- * @param onClicked Lambda que se invoca al hacer clic en el item.
- * @param modifier Modificador opcional para aplicar a este Composable.
  * @author Mario Alguacil Juárez
  */
-@OptIn(ExperimentalMaterial3Api::class) // Necesario para Card y otros componentes de Material3
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProgramaListItem( // Nombre original mantenido, pero con diseño de GridItem
+fun ProgramaListItem(
     programa: Programa,
     onClicked: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
-        onClick = onClicked, // Acción al hacer clic en la tarjeta
-        modifier = modifier
-            .fillMaxWidth()
-        ,
-        shape = RoundedCornerShape(12.dp), // Esquinas redondeadas para la Card
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), // Elevación para sombra
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant) // Color de fondo
+        onClick = onClicked,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally // Centra el texto horizontalmente
+            modifier = Modifier.fillMaxSize(), // La columna ocupa toda la tarjeta
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val imageUrl = programa.imageUrl
             // Imagen del programa
             AsyncImage(
                 model = imageUrl,
-                contentDescription = "Portada de ${programa.name.unescapeHtmlEntities()}", // Descripción para accesibilidad
+                contentDescription = "Portada de ${programa.name.unescapeHtmlEntities()}",
                 modifier = Modifier
-                    .fillMaxWidth() // La imagen ocupa todo el ancho de la Card
-                    .aspectRatio(1f) // Proporción imagen
-                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)), // Redondea solo las esquinas superiores de la imagen
-                // para que coincida con la Card si la Card no tiene padding superior.
-                contentScale = ContentScale.Crop, // Escala la imagen para llenar el espacio y recorta el exceso
-                error = painterResource(R.mipmap.logo_foreground), // Imagen a mostrar si la carga falla
-                placeholder = painterResource(R.mipmap.logo_foreground) // Imagen a mostrar mientras carga
+                    .fillMaxWidth()
+                    .aspectRatio(1f) // Imagen cuadrada
+                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                contentScale = ContentScale.Crop,
+                error = painterResource(R.mipmap.logo_foreground),
+                placeholder = painterResource(R.mipmap.logo_foreground)
             )
 
-            // Espacio entre la imagen y el título
+            // Espacio entre la imagen y el área del título.
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Nombre del Programa
-            Text(
-                text = programa.name.unescapeHtmlEntities(), // Nombre del programa, limpiando entidades HTML
-                style = MaterialTheme.typography.titleSmall, // Estilo del texto para el título
-                fontWeight = FontWeight.SemiBold, // Peso de la fuente
-                color = MaterialTheme.colorScheme.onSurfaceVariant, // Color del texto
-                textAlign = TextAlign.Center, // Alineación del texto
-                maxLines = 2, // Permitir hasta dos líneas para el título
-                overflow = TextOverflow.Ellipsis,
+            // Contenedor para el título, con altura mínima para X líneas.
+            // Calculamos una altura mínima aproximada para 2 líneas de texto.
+            // Esto puede necesitar ajuste fino basado en tu lineHeight y fontSize exactos.
+            val typography = MaterialTheme.typography.titleSmall
+            val twoLinesHeight = with(LocalDensity.current) {
+                // (fontSize + fontPadding) * numLines * factorDeCorreccion
+                // El lineHeight del titleSmall ya debería incluir el padding.
+                // Si typography.lineHeight no está especificado en sp, podríamos usar fontSize.
+                // Por simplicidad, asumimos que titleSmall.fontSize es la base.
+                val fontSizeInDp = typography.fontSize.toDp()
+                // Un lineHeight típico es ~1.2 a 1.5 veces el fontSize.
+                // Si titleSmall tiene un lineHeight definido, sería mejor usarlo.
+                // Vamos a estimar con un factor. (fontSize * 1.3 (lineHeight) * 2 (lines))
+                // o más simple, si una línea son unos 18-20dp, dos líneas son 36-40dp.
+                // Para titleSmall (14.sp por defecto en M3), con lineHeight (20.sp por defecto)
+                // 20.sp * 2 líneas = 40.sp.
+                (typography.lineHeight * 2).toDp() // Esto es lo más correcto si lineHeight está en sp
+            }
+
+            Column(
                 modifier = Modifier
-                    .padding(horizontal = 8.dp) // Padding horizontal para el texto
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
                     .padding(bottom = 8.dp) // Padding inferior para separar del borde de la Card
-            )
+                    // Establezco una altura mínima para el área del título.
+                    // Esto asegura que incluso los títulos de una línea reserven espacio como si tuvieran dos,
+                    // ayudando a alinear las tarjetas en una fila de la cuadrícula.
+                    .heightIn(min = twoLinesHeight), // Altura mínima para el contenedor del título
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center // Centrar el texto verticalmente si ocupa menos de la altura mínima
+            ) {
+                Text(
+                    text = programa.name.unescapeHtmlEntities(),
+                    style = typography, // Usar la tipografía definida arriba
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2, // Limito el título a un máximo de 3 líneas.
+                    overflow = TextOverflow.Ellipsis, // Si excede, se trunca con puntos suspensivos.
+                    // No necesito un modifier aquí si el Column padre maneja el padding y la altura.
+                )
+            }
         }
     }
 }

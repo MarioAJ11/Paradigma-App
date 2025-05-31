@@ -5,126 +5,157 @@ import androidx.lifecycle.viewModelScope
 import com.example.paradigmaapp.exception.NoInternetException
 import com.example.paradigmaapp.exception.ServerErrorException
 import com.example.paradigmaapp.model.Episodio
-import com.example.paradigmaapp.repository.WordpressService
+import com.example.paradigmaapp.repository.contracts.EpisodioRepository
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import timber.log.Timber
 
+/**
+ * ViewModel para mi pantalla de búsqueda de episodios.
+ * Gestiono el estado del texto de búsqueda, los resultados, el estado de carga
+ * y los posibles errores. La búsqueda se activa cuando el usuario introduce al menos 3 caracteres
+ * y se realiza un debounce para no sobrecargar con peticiones.
+ * Los resultados del servidor se filtran adicionalmente en el cliente para asegurar que el término
+ * de búsqueda esté presente en el título del episodio.
+ *
+ * @author Mario Alguacil Juárez
+ */
 @OptIn(FlowPreview::class)
-class SearchViewModel(private val wordpressService: WordpressService) : ViewModel() {
+class SearchViewModel(
+    // Ahora dependo de la abstracción del repositorio de episodios.
+    private val episodioRepository: EpisodioRepository
+    // Si necesitara SavedStateHandle:
+    // private val savedStateHandle: SavedStateHandle
+) : ViewModel() {
 
+    // Texto actual introducido por el usuario en la barra de búsqueda.
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
 
+    // Lista de episodios que coinciden con la búsqueda.
     private val _searchResults = MutableStateFlow<List<Episodio>>(emptyList())
     val searchResults: StateFlow<List<Episodio>> = _searchResults.asStateFlow()
 
+    // Indica si una búsqueda está actualmente en progreso.
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
+    // Mensaje de error si la búsqueda falla o no produce resultados significativos.
     private val _searchError = MutableStateFlow<String?>(null)
     val searchError: StateFlow<String?> = _searchError.asStateFlow()
 
+    // Job para la corutina de búsqueda, para poder cancelarla si el texto cambia.
     private var searchJob: Job? = null
 
     init {
+        // Observo los cambios en el texto de búsqueda.
         viewModelScope.launch {
             _searchText
-                .debounce(400) // Espera 400ms después de la última entrada antes de buscar
-                .distinctUntilChanged() // Solo busca si el texto ha cambiado
-                .collectLatest { query ->
-                    if (query.length > 2) { // Solo busca si la query tiene al menos 3 caracteres
+                .debounce(400) // Espero 400ms después de la última entrada para evitar búsquedas excesivas.
+                .distinctUntilChanged() // Solo busco si el texto realmente ha cambiado.
+                .collectLatest { query -> // Uso collectLatest para cancelar búsquedas previas si la query cambia rápido.
+                    if (query.length > 2) { // Solo inicio la búsqueda si la query tiene más de 2 caracteres.
                         performSearch(query)
                     } else {
+                        // Si la query es muy corta, limpio los resultados y el estado.
                         _searchResults.value = emptyList()
                         _isSearching.value = false
-                        // Limpiar error si la query es muy corta, pero no si ya hay un error de red/servidor
-                        if (_searchError.value?.startsWith("No se encontraron") == true || _searchError.value == null) {
+                        // Limpio el error solo si era un error de "no encontrado" o no había error,
+                        // para no borrar errores de red/servidor persistentes.
+                        if (_searchError.value?.startsWith("No se encontraron") == true ||
+                            _searchError.value?.startsWith("Ningún título coincide") == true ||
+                            _searchError.value == null) {
                             _searchError.value = null
                         }
-                        searchJob?.cancel() // Cancelar cualquier búsqueda en curso
+                        searchJob?.cancel() // Cancelo cualquier búsqueda en curso.
                     }
                 }
         }
     }
 
+    /**
+     * Se llama cuando el texto en la UI de búsqueda cambia.
+     * @param query El nuevo texto de búsqueda.
+     */
     fun onSearchTextChanged(query: String) {
         _searchText.value = query
     }
 
+    // Realiza la búsqueda de episodios.
     private fun performSearch(query: String) {
-        searchJob?.cancel()
+        searchJob?.cancel() // Cancelo cualquier búsqueda anterior.
         searchJob = viewModelScope.launch {
             _isSearching.value = true
-            _searchError.value = null // Limpiar error al iniciar nueva búsqueda
-            _searchResults.value = emptyList() // Limpiar resultados anteriores inmediatamente
+            _searchError.value = null // Limpio errores al iniciar una nueva búsqueda.
+            _searchResults.value = emptyList() // Limpio resultados anteriores.
             try {
-                Timber.d("SearchViewModel: Iniciando búsqueda para: '$query'")
-                // Pequeño delay para que el usuario vea el indicador de carga si la respuesta es muy rápida
-                delay(200)
+                // Un pequeño delay opcional para mejorar la percepción de la UI si la respuesta es muy rápida.
+                // delay(200)
 
-                // Paso 1: Obtener resultados del servidor (búsqueda general de WordPress)
-                val serverResults = wordpressService.buscarEpisodios(query)
-                Timber.d("SearchViewModel: Resultados del servidor (antes de cualquier filtro local): ${serverResults.size} para query '$query'")
-                serverResults.take(5).forEach { ep ->
-                    Timber.d("SearchViewModel: Título del servidor ejemplo: '${ep.title}' (ID: ${ep.id})")
-                }
+                // Obtengo los resultados del servidor usando la interfaz del repositorio.
+                val serverResults = episodioRepository.buscarEpisodios(query)
 
-                // Paso 2: Filtrar en el cliente para frase exacta en el título (ignorando mayúsculas/minúsculas)
+                // Filtro los resultados del servidor localmente para asegurar que el término de búsqueda
+                // está contenido en el título del episodio (ignorando mayúsculas/minúsculas).
                 val filteredByTitleResults = serverResults.filter { episodio ->
-                    // episodio.title ya es el título renderizado y decodificado de entidades HTML
                     episodio.title.contains(query, ignoreCase = true)
                 }
-                Timber.d("SearchViewModel: Resultados filtrados por título localmente: ${filteredByTitleResults.size}")
 
                 if (filteredByTitleResults.isNotEmpty()) {
+                    // Si encuentro episodios cuyo título coincide, los muestro.
                     _searchResults.value = filteredByTitleResults
-                    // _searchError.value = null // Ya se limpió al inicio
                 } else if (serverResults.isNotEmpty()) {
-                    // No se encontró por título, pero el servidor devolvió algo (quizás por contenido)
-                    _searchResults.value = serverResults // Mostrar todos los resultados del servidor
+                    // Si no hay coincidencias de título, pero el servidor devolvió resultados
+                    // (quizás el término estaba en el contenido), muestro todos los resultados del servidor.
+                    _searchResults.value = serverResults
                     _searchError.value = "Ningún título coincide con \"$query\". Mostrando ${serverResults.size} resultados relacionados."
-                    Timber.d("SearchViewModel: Ningún título coincidió. Mostrando resultados generales del servidor.")
                 } else {
-                    // Ni el filtro por título ni el servidor encontraron nada
+                    // Si no se encontró nada, ni en el servidor ni por filtro de título.
                     _searchResults.value = emptyList()
                     _searchError.value = "No se encontraron episodios para \"$query\"."
-                    Timber.d("SearchViewModel: No se encontraron resultados ni en servidor ni por filtro de título.")
                 }
 
             } catch (e: NoInternetException) {
-                Timber.e(e, "SearchViewModel: Error de red durante la búsqueda para query '$query'")
                 _searchError.value = e.message ?: "Sin conexión a internet. Revisa tu conexión."
                 _searchResults.value = emptyList()
             } catch (e: ServerErrorException) {
-                Timber.e(e, "SearchViewModel: Error de servidor durante la búsqueda para query '$query'")
                 _searchError.value = e.userFriendlyMessage
                 _searchResults.value = emptyList()
-            } catch (e: Exception) { // Otras excepciones
-                Timber.e(e, "SearchViewModel: Error inesperado durante la búsqueda para query '$query'")
+            } catch (e: Exception) {
                 _searchError.value = "Ocurrió un error al realizar la búsqueda."
                 _searchResults.value = emptyList()
             } finally {
-                _isSearching.value = false
+                _isSearching.value = false // Termino el estado de búsqueda.
             }
         }
     }
 
+    /**
+     * Limpia el texto de búsqueda actual y, consecuentemente, los resultados.
+     */
     fun clearSearch() {
         _searchText.value = ""
-        // El colector de _searchText se encargará de limpiar los resultados y el estado.
+        // El colector de _searchText en init se encargará de limpiar el resto.
     }
 
+    /**
+     * Permite reintentar la última búsqueda realizada.
+     * Útil si hubo un error de red/servidor.
+     */
     fun retrySearch() {
         val currentQuery = _searchText.value
-        if (currentQuery.length > 2) {
+        if (currentQuery.length > 2) { // Solo reintento si la query es válida.
             performSearch(currentQuery)
         }
     }
 
+    // Cancelo el job de búsqueda si el ViewModel se destruye.
     override fun onCleared() {
         super.onCleared()
         searchJob?.cancel()

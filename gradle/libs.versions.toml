@@ -1,89 +1,68 @@
-# gradle/libs.versions.toml
 
 [versions]
-agp = "8.10.0" # Versión del Plugin de Android para Gradle
-kotlin = "2.0.0" # Versión de Kotlin
-kotlinx-coroutines = "1.7.3" # Versión de Kotlinx Coroutines
-kotlinx-serialization = "1.6.3" # Versión de Kotlinx Serialization (compatible con Kotlin 2.0.0)
-ktor = "2.3.10" # Versión actualizada de Ktor (revisar la última estable si es necesario)
-coil = "2.6.0" # Versión actualizada de Coil
-timber = "5.0.1" # Versión de Timber
 
-# Compose
-# Es crucial que esta versión sea compatible con tu versión de Kotlin.
-# Para Kotlin 2.0.0, considera versiones como 1.5.12 o superior del artefacto androidx.compose.compiler:compiler
-compose-compiler-extension = "1.5.4" # Versión de la *extensión* del compilador de Compose que usarás en composeOptions.
-# El *plugin* de Gradle (org.jetbrains.kotlin.plugin.compose) usará la versión de Kotlin.
-compose-bom = "2024.05.00" # Bill of Materials para Compose (recomendado para alinear versiones de Compose)
-# Las siguientes versiones de compose-ui y material3 se ignorarán si usas el BOM.
-# compose-ui = "1.5.4" # (Tu versión original para UI, el BOM lo gestionará mejor)
-# compose-material3 = "1.1.2" # (Tu versión original para Material3, el BOM lo gestionará mejor)
-androidx-activityCompose = "1.9.0" # Versión de Activity Compose
-androidx-lifecycleViewmodelCompose = "2.8.0" # Versión de ViewModel Compose
+agp = "8.10.0"
 
-# Navigation
-androidx-navigation = "2.7.7" # Versión estable de AndroidX Navigation
+kotlin = "2.0.0"
+kotlinx-coroutines = "1.8.0"
 
-# Media3
-androidx-media3 = "1.3.1" # Versión unificada para componentes Media3
+compose-compiler-extension = "1.5.4"
+kotlinx-serialization = "1.6.3"
 
-# Ya no necesitas estas versiones específicas si usas androidx-navigation para todo lo relacionado.
-# navigationComposeJvmstubs = "2.9.0" # Esta es la que causaba problemas, la reemplazaremos.
-# navigationRuntimeAndroid = "2.9.0" # Se puede reemplazar por androidx-navigation-runtime-ktx
+ktor = "2.3.10"
 
-# material3Android = "1.3.2" # Este artefacto "material3-android" no es estándar. Usar compose-material3 del BOM.
+coil = "2.6.0"
+
+timber = "5.0.1"
+
+compose-bom = "2024.05.00"
+
+androidx-activityCompose = "1.9.0"
+androidx-lifecycleViewmodelCompose = "2.8.0"
+
+androidx-navigation = "2.7.7"
+
+androidx-media3 = "1.3.1"
+
 
 [libraries]
-# Kotlin
+
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin"}
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 
-# Coroutines
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 
-# Serialization
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 
-# Ktor (Cliente HTTP)
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
-ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" } # Motor Ktor para Android (alternativa a OkHttp)
-ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" } # Motor OkHttp para Ktor en Android (recomendado)
-ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" } # Motor Ktor para iOS
+ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 
-# Jetpack Compose
-# Se recomienda usar el BOM de Compose para gestionar versiones.
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom"}
-compose-ui = { group = "androidx.compose.ui", name = "ui" } # La versión se toma del BOM
+compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics"}
-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" } # Solo para debugImplementation
+compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
-compose-material3 = { group = "androidx.compose.material3", name = "material3"} # La versión se toma del BOM
+compose-material3 = { group = "androidx.compose.material3", name = "material3"}
 androidx-compose-material-icons-core = {group = "androidx.compose.material", name = "material-icons-core"}
 androidx-compose-material-icons-extended = {group = "androidx.compose.material", name = "material-icons-extended"}
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycleViewmodelCompose"}
 
-# Navigation (Navegación en Compose) - Usando la dependencia estándar
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "androidx-navigation" }
-androidx-navigation-runtime-ktx = { module = "androidx.navigation:navigation-runtime-ktx", version.ref = "androidx-navigation" } # Alternativa a navigation-runtime-android
-
-# Media3 (Reproductor de medios)
+androidx-navigation-runtime-ktx = { module = "androidx.navigation:navigation-runtime-ktx", version.ref = "androidx-navigation" }
 androidx-media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "androidx-media3" }
 androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "androidx-media3" }
 androidx-media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "androidx-media3" }
 androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "androidx-media3" }
-
-# Coil (Carga de imágenes)
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
-
-# Timber (Logging)
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
-
 
 
 [plugins]
@@ -91,7 +70,5 @@ androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
 kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
-kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" } # Plugin de serialización
-# El plugin del compilador de Compose. Su versión de *plugin* está ligada a Kotlin.
-# La *extensión* del compilador (kotlinCompilerExtensionVersion) se define en composeOptions.
+kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
