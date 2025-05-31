@@ -28,9 +28,10 @@ import com.example.paradigmaapp.android.viewmodel.DownloadedEpisodioViewModel
 import com.example.paradigmaapp.android.viewmodel.MainViewModel
 import com.example.paradigmaapp.android.viewmodel.ProgramaViewModel
 import com.example.paradigmaapp.android.viewmodel.QueueViewModel
-import com.example.paradigmaapp.android.utils.extractTextFromHtml
+import com.example.paradigmaapp.android.utils.extractMeaningfulDescription // Cambio aquí
 import com.example.paradigmaapp.android.utils.unescapeHtmlEntities
 import com.example.paradigmaapp.model.Episodio
+import com.example.paradigmaapp.model.Programa
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +47,7 @@ fun ProgramaScreen(
     val episodios by programaViewModel.episodios.collectAsState()
     val isLoadingPrograma by programaViewModel.isLoadingPrograma.collectAsState()
     val isLoadingEpisodios by programaViewModel.isLoadingEpisodios.collectAsState()
-    val error by programaViewModel.error.collectAsState() // Ya existe, lo usaremos
+    val error by programaViewModel.error.collectAsState()
 
     val downloadedEpisodeIds by downloadedViewModel.downloadedEpisodeIds.collectAsState()
     val queueEpisodeIds by queueViewModel.queueEpisodeIds.collectAsState()
@@ -56,7 +57,7 @@ fun ProgramaScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        if (error != null && programa == null && !isLoadingPrograma) { // Error crítico al cargar el programa
+        if (error != null && programa == null && !isLoadingPrograma) {
             val errorType = if (error!!.contains("internet", ignoreCase = true) || error!!.contains("conectar", ignoreCase = true)) {
                 ErrorType.NO_INTERNET
             } else {
@@ -65,22 +66,21 @@ fun ProgramaScreen(
             ErrorView(
                 message = error!!,
                 errorType = errorType,
-                onRetry = { programaViewModel.loadProgramaConEpisodios() }
+                onRetry = { programaViewModel.loadProgramaConEpisodios() },
+                modifier = Modifier.align(Alignment.Center)
             )
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 16.dp,
-                    bottom = 16.dp
-                )
+                contentPadding = PaddingValues(bottom = 16.dp)
             ) {
-                // Cabecera del Programa
                 item {
+                    Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = 16.dp)
+                            .padding(top = 16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         if (isLoadingPrograma && programa == null) {
@@ -106,12 +106,14 @@ fun ProgramaScreen(
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 prog.description?.takeIf { it.isNotBlank() }?.let { desc ->
                                     Text(
-                                        text = desc.extractTextFromHtml().unescapeHtmlEntities(),
+                                        // Usar extractMeaningfulDescription para la descripción del programa
+                                        text = desc.extractMeaningfulDescription(),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.fillMaxWidth()
@@ -123,21 +125,18 @@ fun ProgramaScreen(
                     }
                 }
 
-                // Etiqueta "Episodios" (Solo si el programa se cargó o se está cargando)
-                if (programa != null || isLoadingPrograma) {
+                if (programa != null) {
                     item {
                         Text(
                             text = "Episodios",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
 
-                // Lógica para mostrar episodios, carga o error específico de episodios
                 when {
                     isLoadingEpisodios && episodios.isEmpty() && programa != null -> {
                         item {
@@ -147,7 +146,7 @@ fun ProgramaScreen(
                             ) { CircularProgressIndicator() }
                         }
                     }
-                    error != null && episodios.isEmpty() && programa != null && !isLoadingEpisodios -> { // Error al cargar episodios, pero el programa sí cargó
+                    error != null && episodios.isEmpty() && programa != null && !isLoadingEpisodios -> {
                         item {
                             val errorTypeEpisodios = if (error!!.contains("internet", ignoreCase = true) || error!!.contains("conectar", ignoreCase = true)) {
                                 ErrorType.NO_INTERNET
@@ -204,7 +203,7 @@ fun ProgramaScreen(
                     start = 8.dp,
                     top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp
                 )
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.0f), CircleShape)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f), CircleShape)
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,

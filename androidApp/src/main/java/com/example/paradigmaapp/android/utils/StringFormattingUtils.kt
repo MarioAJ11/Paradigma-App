@@ -1,57 +1,71 @@
 package com.example.paradigmaapp.android.utils
 
-import com.example.paradigmaapp.model.Programa // Necesario si imageUrlFromDescription es extensión de Programa
+import com.example.paradigmaapp.model.Programa
+import kotlin.text.Regex
+import kotlin.text.RegexOption
 
-/**
- * Decodifica entidades HTML comunes de una cadena de texto.
- * @receiver La cadena de texto que puede contener entidades HTML.
- * @return La cadena con las entidades HTML reemplazadas por sus caracteres correspondientes.
- * @author Mario Alguacil Juárez
- */
 fun String.unescapeHtmlEntities(): String {
     return this.replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
         .replace("&#039;", "'")
-        .replace("&apos;", "'") // Otra forma común para apóstrofo
-        .replace("&#8217;", "’") // Apóstrofo rizado derecho
-        .replace("&#8211;", "–") // Guion corto (en dash)
-        .replace("&#8212;", "—") // Guion largo (em dash)
-        .replace("&#8230;", "…") // Puntos suspensivos
-        .replace("&#8220;", "“") // Comilla doble izquierda
-        .replace("&#8221;", "”") // Comilla doble derecha
-        .replace("&#171;", "«")  // Comillas angulares izquierdas (laquo)
-        .replace("&#187;", "»")  // Comillas angulares derechas (raquo)
-        .replace("&nbsp;", " ") // Espacio de no ruptura
-    // En caso necesario de necesario añadir más se podría
+        .replace("&apos;", "'")
+        .replace("&#8217;", "’")
+        .replace("&#8211;", "–")
+        .replace("&#8212;", "—")
+        .replace("&#8230;", "…")
+        .replace("&#8220;", "“")
+        .replace("&#8221;", "”")
+        .replace("&#171;", "«")
+        .replace("&#187;", "»")
+        .replace("&nbsp;", " ")
 }
 
-/**
- * Elimina etiquetas HTML de una cadena de texto de forma básica.
- * Para una solución más robusta, considera usar una biblioteca de parseo HTML si el HTML es complejo.
- * @receiver La cadena de texto que puede contener etiquetas HTML.
- * @return La cadena sin etiquetas HTML, con espacios en blanco al inicio/final eliminados.
- * @author Mario Alguacil Juárez
- */
-fun String.extractTextFromHtml(): String {
-    // Regex para eliminar cualquier cosa entre < y >
+fun String.stripHtmlTags(): String {
     return this.replace(Regex("<[^>]*>"), "").trim()
 }
 
-/**
- * Intenta extraer una URL de imagen de la descripción de un programa.
- * Este es un método heurístico y puede necesitar ajustes basados en cómo tu WordPress
- * almacena o muestra las imágenes de los programas en sus descripciones.
- * Idealmente, la API de WordPress proveería un campo dedicado para la imagen del programa.
- *
- * @receiver El objeto [Programa] del cual se intenta extraer la URL de la imagen.
- * @return La URL de la imagen encontrada, o null si no se encuentra ninguna.
- * @author Mario Alguacil Juárez
- */
+fun String.extractMeaningfulDescription(maxLength: Int = 350): String {
+    // 1. Decodificar entidades HTML una sola vez al principio.
+    val decodedHtml = this.unescapeHtmlEntities()
+
+    // 2. Intentar extraer el contenido del primer tag <p>
+    val firstParagraphRegex = Regex(
+        pattern = "<p[^>]*>(.*?)</p>", // Permite atributos en el tag <p>
+        options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+    )
+    val paragraphMatch = firstParagraphRegex.find(decodedHtml) // Buscar una sola vez
+    var meaningfulText: String
+    val extractedFromActualParagraph = paragraphMatch != null // Guardar si se encontró un <p>
+
+    if (extractedFromActualParagraph) {
+        // Si encontramos un párrafo, tomamos su contenido y limpiamos cualquier HTML interno
+        meaningfulText = paragraphMatch!!.groupValues[1].stripHtmlTags().trim() // Usar !! porque ya comprobamos != null
+        // Reemplazar múltiples saltos de línea/espacios que puedan quedar tras stripHtmlTags a un solo espacio o \n
+        meaningfulText = meaningfulText.replace(Regex("\\s*\\n\\s*"), "\n").trim() // Consolida saltos de línea
+        meaningfulText = meaningfulText.replace(Regex("\\s+"), " ") // Consolida espacios múltiples a uno solo
+    } else {
+        // 3. Si no hay tag <p> explícito, limpiar todo el HTML del string decodificado
+        meaningfulText = decodedHtml.stripHtmlTags().trim()
+        meaningfulText = meaningfulText.replace(Regex("\\s*\\n\\s*"), "\n").trim()
+        meaningfulText = meaningfulText.replace(Regex("\\s+"), " ")
+
+        // Truncar si es demasiado largo Y no vino de un <p> específico
+        if (meaningfulText.length > maxLength) {
+            val trimPosition = meaningfulText.substring(0, maxLength).lastIndexOf(' ')
+            meaningfulText = if (trimPosition > 0 && trimPosition > maxLength - 50) { // Evitar truncar a una palabra muy corta
+                meaningfulText.substring(0, trimPosition).trim() + "..."
+            } else {
+                meaningfulText.substring(0, maxLength).trim() + "..."
+            }
+        }
+    }
+    return meaningfulText
+}
+
 fun Programa.imageUrlFromDescription(): String? {
-    val desc = this.description ?: return null // Si no hay descripción, no hay imagen que extraer.
-    // Regex simple para buscar la primera etiqueta <img> y extraer su atributo src.
+    val desc = this.description ?: return null
     val imgTagRegex = Regex("""<img[^>]+src\s*=\s*['"]([^'"]+)['"]""")
     return imgTagRegex.find(desc)?.groups?.get(1)?.value
 }
