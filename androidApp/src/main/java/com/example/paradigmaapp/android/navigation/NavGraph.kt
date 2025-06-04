@@ -22,12 +22,20 @@ import com.example.paradigmaapp.android.screens.*
 import com.example.paradigmaapp.android.ui.SettingsScreen
 import com.example.paradigmaapp.android.viewmodel.*
 import kotlinx.coroutines.launch
-import timber.log.Timber
 
 /**
  * Define el grafo de navegación principal de la aplicación.
- * Incluye el BottomSheetScaffold, AudioPlayer global, y gestiona la instanciación
- * de ViewModels específicos de pantalla usando la ViewModelFactory.
+ * Este Composable configura el `NavHost` para la navegación entre pantallas.
+ * Utiliza un `BottomSheetScaffold` para mostrar el `VolumeControl` en un panel
+ * que se puede expandir o colapsar desde la parte inferior.
+ * La lógica para mostrar/ocultar el panel de volumen se ha ajustado para evitar
+ * el uso de la función `hide()` y así prevenir un `IllegalStateException` si
+ * `skipHiddenState` es true (lo cual se asume si `rememberSheetState` no es configurable).
+ *
+ * @param navController El [NavHostController] que gestiona la pila de navegación.
+ * @param viewModelFactory La factoría para crear instancias de [ViewModel].
+ * @param mainViewModel El [MainViewModel] principal para el estado global.
+ * @param searchViewModel El [SearchViewModel] para la búsqueda.
  *
  * @author Mario Alguacil Juárez
  */
@@ -41,7 +49,6 @@ fun NavGraph(
 ) {
     val coroutineScope = rememberCoroutineScope()
 
-    // Estados del reproductor (observados desde MainViewModel)
     val currentPlayingEpisode by mainViewModel.currentPlayingEpisode.collectAsState()
     val isPodcastPlaying by mainViewModel.isPodcastPlaying.collectAsState()
     val isAndainaPlaying by mainViewModel.isAndainaPlaying.collectAsState()
@@ -49,11 +56,12 @@ fun NavGraph(
     val episodeProgress by mainViewModel.podcastProgress.collectAsState()
     val isAndainaStreamActive by mainViewModel.isAndainaStreamActive.collectAsState()
 
+    // Usamos rememberBottomSheetScaffoldState() directamente.
+    // Esto implicará que su SheetState interno probablemente tenga skipHiddenState = true.
     val volumeBottomSheetScaffoldState = rememberBottomSheetScaffoldState()
+
     var showSettingsDialog by remember { mutableStateOf(false) }
 
-    // Acceder a los ViewModels que MainViewModel ya tiene instancias
-    // Estos ViewModels son gestionados por MainViewModel o creados por la factory según sea necesario.
     val queueViewModel = mainViewModel.queueViewModel
     val downloadedViewModel = mainViewModel.downloadedViewModel
     val onGoingViewModel = mainViewModel.onGoingViewModel
@@ -61,17 +69,30 @@ fun NavGraph(
     BottomSheetScaffold(
         scaffoldState = volumeBottomSheetScaffoldState,
         sheetContent = {
+            // Tu Composable VolumeControl se coloca aquí.
             VolumeControl(
                 onVolumeChanged = { newVolume ->
-                    val activePlayer = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer else mainViewModel.andainaStreamPlayer.exoPlayer
+                    val activePlayer = if (currentPlayingEpisode != null) {
+                        mainViewModel.podcastExoPlayer
+                    } else {
+                        mainViewModel.andainaStreamPlayer.exoPlayer
+                    }
                     activePlayer?.let { player ->
                         player.volume = newVolume.coerceIn(0f, 1f)
                     }
                 },
-                currentVolume = (if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer.volume else mainViewModel.andainaStreamPlayer.exoPlayer?.volume ?: 0f)
+                currentVolume = (if (currentPlayingEpisode != null) {
+                    mainViewModel.podcastExoPlayer.volume
+                } else {
+                    mainViewModel.andainaStreamPlayer.exoPlayer?.volume ?: 0f
+                })
             )
         },
+        // Establecemos peekHeight a 0.dp. Cuando el sheet esté en estado PartiallyExpanded,
+        // debería ser invisible si su contenido no fuerza una altura mayor.
         sheetPeekHeight = 0.dp,
+        // Podrías considerar sheetSwipeEnabled = false si no quieres que el usuario lo deslice manualmente
+        // y solo controlarlo por el botón. Por ahora, lo dejamos habilitado.
         containerColor = MaterialTheme.colorScheme.background
     )  { paddingValuesDelBottomSheet ->
         Column(
@@ -90,7 +111,6 @@ fun NavGraph(
                     HomeScreen(
                         mainViewModel = mainViewModel,
                         onProgramaSelected = { progId, progNombre ->
-                            // Navega a la pantalla del programa con su ID y nombre
                             navController.navigate(Screen.Programa.createRoute(progId, progNombre))
                         },
                     )
@@ -99,21 +119,18 @@ fun NavGraph(
                 // Definición de la pantalla de Programa (ProgramaScreen)
                 composable(
                     route = Screen.Programa.route,
-                    arguments = listOf( // Argumentos que espera esta ruta
+                    arguments = listOf(
                         navArgument("programaId") { type = NavType.IntType },
                         navArgument("programaNombre") { type = NavType.StringType }
                     )
                 ) { navBackStackEntry ->
                     val arguments = navBackStackEntry.arguments
-                    val programaIdFromArgs = arguments?.getInt("programaId") ?: -1 // Obtiene el ID del programa
-
-                    // Crea el ProgramaViewModel con una clave única y el navBackStackEntry como owner
+                    val programaIdFromArgs = arguments?.getInt("programaId") ?: -1
                     val programaViewModel: ProgramaViewModel = viewModel(
-                        key = "programa_vm_$programaIdFromArgs", // Clave única para el ViewModel
-                        viewModelStoreOwner = navBackStackEntry, // Asocia el ViewModel al ciclo de vida de esta entrada de navegación
-                        factory = viewModelFactory // Usa la factory global
+                        key = "programa_vm_$programaIdFromArgs",
+                        viewModelStoreOwner = navBackStackEntry,
+                        factory = viewModelFactory
                     )
-
                     ProgramaScreen(
                         programaViewModel = programaViewModel,
                         mainViewModel = mainViewModel,
@@ -199,9 +216,8 @@ fun NavGraph(
                         onBackClick = { navController.popBackStack() }
                     )
                 }
-            }
+            } // Fin del NavHost
 
-            // Reproductor de Audio Global
             AudioPlayer(
                 activePlayer = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer else mainViewModel.andainaStreamPlayer.exoPlayer,
                 currentEpisode = currentPlayingEpisode,
@@ -213,24 +229,26 @@ fun NavGraph(
                 onPlayPauseClick = { mainViewModel.onPlayerPlayPauseClick() },
                 onPlayStreamingClick = { mainViewModel.toggleAndainaStreamActive() },
                 onEpisodeInfoClick = { episodio ->
-                    Timber.d("Info click para episodio: ${episodio.title}")
-                    navController.navigate("episode_detail_screen/${episodio.id}")
+                    navController.navigate(Screen.EpisodeDetail.createRoute(episodio.id))
                 },
-                onVolumeIconClick = { // Acción para mostrar el control de volumen (BottomSheet)
+                // Lógica alternativa y más explícita para onVolumeIconClick
+                onVolumeIconClick = {
                     coroutineScope.launch {
-                        if (volumeBottomSheetScaffoldState.bottomSheetState.isVisible) {
-                            volumeBottomSheetScaffoldState.bottomSheetState.hide()
+                        val sheetState = volumeBottomSheetScaffoldState.bottomSheetState
+                        if (sheetState.currentValue == SheetValue.Expanded) {
+                            sheetState.partialExpand() // Intenta colapsar a peekHeight (0.dp)
                         } else {
-                            volumeBottomSheetScaffoldState.bottomSheetState.expand()
+                            // Si está PartiallyExpanded (en 0.dp) o Hidden (aunque no deberíamos llegar a Hidden
+                            // si skipHiddenState=true), lo expandimos.
+                            sheetState.expand()
                         }
                     }
                 }
             )
 
-            // Barra de Navegación Inferior
             BottomNavigationBar(
                 navController = navController,
-                onSearchClick = { // Navega a la pantalla de búsqueda
+                onSearchClick = {
                     if (navController.currentDestination?.route != Screen.Search.route) {
                         navController.navigate(Screen.Search.route) {
                             popUpTo(Screen.Home.route) { saveState = true }
@@ -241,19 +259,18 @@ fun NavGraph(
                 onOnGoingClick = { navController.navigate(Screen.OnGoing.route) { popUpTo(Screen.Home.route); launchSingleTop = true } },
                 onDownloadedClick = { navController.navigate(Screen.Downloads.route) { popUpTo(Screen.Home.route); launchSingleTop = true } },
                 onQueueClick = { navController.navigate(Screen.Queue.route) { popUpTo(Screen.Home.route); launchSingleTop = true } },
-                onSettingsClick = { showSettingsDialog = true } // Muestra el diálogo de ajustes
+                onSettingsClick = { showSettingsDialog = true }
             )
         }
     }
 
-    // Diálogo de Ajustes (si showSettingsDialog es true)
     if (showSettingsDialog) {
         SettingsScreen(
-            onDismissRequest = { showSettingsDialog = false }, // Acción para cerrar el diálogo
+            onDismissRequest = { showSettingsDialog = false },
             isStreamActive = isAndainaStreamActive,
             onStreamActiveChanged = {
-                mainViewModel.toggleAndainaStreamActive() // Cambia el estado del stream
-                showSettingsDialog = false // Cierra el diálogo después del cambio
+                mainViewModel.toggleAndainaStreamActive()
+                showSettingsDialog = false
             }
         )
     }
