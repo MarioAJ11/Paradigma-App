@@ -2,31 +2,68 @@ package com.example.paradigmaapp.android.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.paradigmaapp.android.R
 import com.example.paradigmaapp.model.Episodio
-import timber.log.Timber
 
+/**
+ * Un Composable que muestra un ítem individual de [Episodio] en una lista.
+ * Proporciona información básica del episodio como imagen y título.
+ * Incluye interactividad para reproducir el episodio, una acción de pulsación larga,
+ * y un menú contextual con opciones adicionales.
+ * La imagen se muestra sin padding y el título se muestra completo.
+ *
+ * @param episodio El objeto [Episodio] a mostrar.
+ * @param onPlayEpisode Lambda que se invoca cuando el usuario hace clic en el ítem para reproducir el episodio.
+ * @param onEpisodeLongClick Lambda que se invoca cuando el usuario realiza una pulsación larga sobre el ítem.
+ * @param onAddToQueue Lambda para añadir el episodio a la cola de reproducción.
+ * @param onRemoveFromQueue Lambda para eliminar el episodio de la cola de reproducción.
+ * @param onDownloadEpisode Lambda para iniciar la descarga del episodio.
+ * @param onDeleteDownload Lambda para eliminar un episodio descargado.
+ * @param isDownloaded Booleano que indica si el episodio está actualmente descargado.
+ * @param isInQueue Booleano que indica si el episodio está actualmente en la cola de reproducción.
+ * @param modifier Modificador opcional para aplicar al [Card] principal.
+ *
+ * @author Mario Alguacil Juárez
+ */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun EpisodioListItem(
     episodio: Episodio,
     onPlayEpisode: (Episodio) -> Unit,
-    onEpisodeLongClick: (Episodio) -> Unit, // Nueva lambda para pulsación larga
-    // onShowOptionsMenu ya no es un parámetro; el menú se maneja internamente por el IconButton
+    onEpisodeLongClick: (Episodio) -> Unit,
     onAddToQueue: (Episodio) -> Unit,
     onRemoveFromQueue: (Episodio) -> Unit,
     onDownloadEpisode: (Episodio, (String) -> Unit) -> Unit,
@@ -35,7 +72,7 @@ fun EpisodioListItem(
     isInQueue: Boolean,
     modifier: Modifier = Modifier
 ) {
-    var showContextMenu by remember { mutableStateOf(false) } // Renombrado para claridad
+    var showContextMenu by remember { mutableStateOf(false) }
 
     Card(
         modifier = modifier
@@ -43,41 +80,44 @@ fun EpisodioListItem(
             .clip(RoundedCornerShape(12.dp))
             .combinedClickable(
                 onClick = { onPlayEpisode(episodio) },
-                onLongClick = { onEpisodeLongClick(episodio) } // Acción para pulsación larga
+                onLongClick = { onEpisodeLongClick(episodio) }
             ),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(), // El Row ocupa todo el ancho de la Card
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // La imagen ahora no tendrá padding extra con respecto al Row.
+            // El Row sí podría tener padding si se lo aplicas al Card o al Row directamente.
+            // Si el Card tiene padding interno, la imagen aún lo respetará.
+            // Para que la imagen toque los bordes del Card, el Row no debería tener padding horizontal.
             AsyncImage(
                 model = episodio.imageUrl,
                 contentDescription = "Portada de ${episodio.title}",
                 modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(8.dp)),
+                    .size(72.dp) // Aumentamos un poco el tamaño de la imagen para compensar la falta de padding visual
+                    .clip(RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)), // Redondea esquinas izquierdas para que coincida con la Card
                 contentScale = ContentScale.Crop,
                 error = painterResource(R.mipmap.logo_foreground),
                 placeholder = painterResource(R.mipmap.logo_foreground)
             )
 
-            Spacer(modifier = Modifier.width(16.dp))
-
+            // El Spacer y la Column ahora tendrán un padding inicial para separarlos de la imagen
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(vertical = 10.dp),
+                    .padding(horizontal = 16.dp, vertical = 10.dp), // Padding para el contenido de texto
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = episodio.title,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis // Cambiado a Ellipsis para mejor visualización
+                    // maxLines = 2, // Eliminado para mostrar título completo
+                    // overflow = TextOverflow.Ellipsis // Eliminado
                 )
                 if (episodio.duration.isNotBlank() && episodio.duration != "--:--") {
                     Text(
@@ -93,7 +133,7 @@ fun EpisodioListItem(
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterVertically)
-                    .padding(end = 0.dp) // Ajustar si es necesario
+                    .padding(end = 4.dp) // Padding ligero para el botón de menú
             ) {
                 IconButton(onClick = { showContextMenu = true }) {
                     Icon(
@@ -118,9 +158,7 @@ fun EpisodioListItem(
                         DropdownMenuItem(
                             text = { Text("Descargar") },
                             onClick = {
-                                onDownloadEpisode(episodio) { message ->
-                                    Timber.d("EpisodioListItem: Mensaje de descarga: $message")
-                                }
+                                onDownloadEpisode(episodio) { /* Mensaje gestionado por el llamador */ }
                                 showContextMenu = false
                             }
                         )

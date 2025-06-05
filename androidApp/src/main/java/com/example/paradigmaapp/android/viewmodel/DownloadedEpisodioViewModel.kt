@@ -5,14 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.paradigmaapp.android.data.AppPreferences
 import com.example.paradigmaapp.model.Episodio
-import com.example.paradigmaapp.repository.contracts.EpisodioRepository // Usar la interfaz
+import com.example.paradigmaapp.repository.contracts.EpisodioRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-// Timber y logs eliminados
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -20,70 +19,83 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * ViewModel para gestionar mis episodios descargados.
- * Me encargo de persistir la lista de IDs de episodios descargados usando [AppPreferences],
- * obtener los detalles de estos episodios (usando [EpisodioRepository] si no están en caché),
- * y manejar las operaciones de descarga y eliminación de archivos físicos usando el [applicationContext].
+ * ViewModel responsable de gestionar la lógica y el estado de los episodios descargados.
+ * Interactúa con [AppPreferences] para persistir la lista de episodios descargados y
+ * con [EpisodioRepository] para obtener detalles de los episodios si es necesario.
+ * También maneja las operaciones de descarga y eliminación de archivos físicos.
+ *
+ * @property appPreferences Instancia de [AppPreferences] para acceder a las preferencias guardadas.
+ * @property episodioRepository Instancia de [EpisodioRepository] para obtener datos de episodios.
+ * @property applicationContext El [Context] de la aplicación, necesario para operaciones de sistema de archivos.
  *
  * @author Mario Alguacil Juárez
  */
 class DownloadedEpisodioViewModel(
     private val appPreferences: AppPreferences,
-    // Ahora dependo de la abstracción del repositorio de episodios.
-    private val episodioRepository: EpisodioRepository,
-    private val applicationContext: Context // Uso el contexto de la aplicación para operaciones de archivo y evitar fugas.
+    private val episodioRepository: EpisodioRepository, //
+    private val applicationContext: Context
 ) : ViewModel() {
 
-    // Lista de IDs de los episodios que han sido descargados.
+    // StateFlow para la lista de IDs de episodios descargados.
     private val _downloadedEpisodeIds = MutableStateFlow<List<Int>>(emptyList())
     val downloadedEpisodeIds: StateFlow<List<Int>> = _downloadedEpisodeIds.asStateFlow()
 
-    // Lista de objetos Episodio completos que están descargados, para la UI.
+    // StateFlow para la lista completa de objetos Episodio que están descargados, para la UI.
     private val _downloadedEpisodios = MutableStateFlow<List<Episodio>>(emptyList())
     val downloadedEpisodios: StateFlow<List<Episodio>> = _downloadedEpisodios.asStateFlow()
 
-    // Caché de todos los episodios disponibles, me la pasa MainViewModel.
+    // Caché de todos los episodios disponibles; se establece externamente (ej. desde MainViewModel).
+    // Ayuda a evitar llamadas innecesarias a la red si el episodio ya está en esta lista.
     private var allAvailableEpisodesCache: List<Episodio> = emptyList()
-    // Límite máximo de episodios que permito descargar.
-    private val MAX_DOWNLOADS = 10
+
+    // Límite máximo de episodios que se permiten descargar.
+    private val MAX_DOWNLOADS = 10 //
 
     init {
-        loadDownloadedState() // Cargo el estado de las descargas al iniciar.
+        loadDownloadedState() // Carga el estado de las descargas al inicializar el ViewModel.
     }
 
     /**
-     * Establece la lista de todos los episodios disponibles.
-     * Esto me permite construir la lista de `_downloadedEpisodios` de forma más eficiente.
-     * @param episodes Lista completa de episodios disponibles.
+     * Establece la lista de todos los episodios disponibles en la aplicación.
+     * Esta caché se utiliza para construir eficientemente la lista de [downloadedEpisodios]
+     * sin necesidad de obtener siempre los detalles del episodio desde el repositorio.
+     *
+     * @param episodes Lista de todos los [Episodio]s disponibles.
      */
     fun setAllAvailableEpisodes(episodes: List<Episodio>) {
         allAvailableEpisodesCache = episodes
-        // Si la caché de episodios se actualiza, reconstruyo la lista de objetos descargados.
+        // Si la caché de episodios se actualiza, es necesario reconstruir la lista de objetos descargados.
         viewModelScope.launch(Dispatchers.IO) {
             updateDownloadedEpisodiosListFromIds()
         }
     }
 
-    // Carga los IDs de los episodios descargados desde SharedPreferences.
+    /**
+     * Carga la lista de IDs de episodios descargados desde [AppPreferences]
+     * y luego actualiza la lista de objetos [Episodio] (`_downloadedEpisodios`).
+     */
     private fun loadDownloadedState() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _downloadedEpisodeIds.value = appPreferences.loadDownloadedEpisodeIds()
-            // Log eliminado: Timber.d("IDs de episodios descargados cargados: ${_downloadedEpisodeIds.value}")
+        viewModelScope.launch(Dispatchers.IO) { // Operaciones de SharedPreferences en hilo de IO.
+            _downloadedEpisodeIds.value = appPreferences.loadDownloadedEpisodeIds() //
             updateDownloadedEpisodiosListFromIds()
         }
     }
 
-    // Guarda la lista actual de IDs de episodios descargados en SharedPreferences.
+    /**
+     * Guarda la lista actual de IDs de episodios descargados en [AppPreferences].
+     */
     private fun saveDownloadedState() {
-        viewModelScope.launch(Dispatchers.IO) {
-            appPreferences.saveDownloadedEpisodeIds(_downloadedEpisodeIds.value)
-            // Log eliminado: Timber.d("IDs de episodios descargados guardados: ${_downloadedEpisodeIds.value}")
+        viewModelScope.launch(Dispatchers.IO) { // Operaciones de SharedPreferences en hilo de IO.
+            appPreferences.saveDownloadedEpisodeIds(_downloadedEpisodeIds.value) //
         }
     }
 
-    // Actualiza `_downloadedEpisodios` basándose en `_downloadedEpisodeIds`.
-    // Intenta obtener los detalles desde `allAvailableEpisodesCache` primero,
-    // y si no, usa `episodioRepository`.
+    /**
+     * Actualiza la lista `_downloadedEpisodios` (objetos [Episodio] completos)
+     * basándose en la lista actual de `_downloadedEpisodeIds`.
+     * Intenta obtener los detalles del episodio desde `allAvailableEpisodesCache` primero;
+     * si no se encuentra, lo busca a través del [episodioRepository].
+     */
     private suspend fun updateDownloadedEpisodiosListFromIds() {
         val episodeDetailsList = mutableListOf<Episodio>()
         for (id in _downloadedEpisodeIds.value) {
@@ -92,31 +104,32 @@ class DownloadedEpisodioViewModel(
                 episodeDetailsList.add(cachedEpisodio)
             } else {
                 try {
-                    // Uso la interfaz del repositorio.
                     episodioRepository.getEpisodio(id)?.let { fetchedEpisodio ->
                         episodeDetailsList.add(fetchedEpisodio)
-                    } // ?: Timber.w("No se encontró el episodio descargado con ID $id.") // Log eliminado
+                    }
+                    // Si no se encuentra el episodio (getEpisodio devuelve null), no se añade.
+                    // Esto podría ocurrir si un ID descargado ya no existe en el backend.
                 } catch (e: Exception) {
-                    // Timber.e(e, "Error al obtener detalles del episodio descargado con ID $id.") // Log eliminado
-                    // Considerar manejo de error.
+                    // Considerar registrar este error en un sistema de monitoreo.
+                    // No se añade el episodio a la lista si hay un error al obtener sus detalles.
                 }
             }
         }
         _downloadedEpisodios.value = episodeDetailsList
-        // Log eliminado: Timber.d("Lista de episodios descargados actualizada con ${episodeDetailsList.size} items.")
     }
 
     /**
      * Inicia la descarga de un episodio.
-     * Verifica si ya está descargado o si se alcanzó el límite de descargas.
-     * Guarda el archivo en el almacenamiento interno de la aplicación.
-     * @param episodio El episodio a descargar.
-     * @param onMessage Callback para enviar mensajes de estado (éxito/error) a la UI.
+     * Verifica si el episodio ya está descargado o si se ha alcanzado el límite de descargas.
+     * El archivo se guarda en el directorio de archivos interno de la aplicación.
+     *
+     * @param episodio El [Episodio] a descargar.
+     * @param onMessage Callback para notificar a la UI sobre el progreso o resultado de la descarga (éxito/error).
+     * Recibe un [String] con el mensaje.
      */
     fun downloadEpisodio(episodio: Episodio, onMessage: (String) -> Unit) {
         if (episodio.archiveUrl == null) {
             onMessage("El episodio '${episodio.title}' no tiene URL de descarga.")
-            // Log eliminado: Timber.w("Episodio ${episodio.id} ('${episodio.title}') no tiene archiveUrl.")
             return
         }
         if (_downloadedEpisodeIds.value.contains(episodio.id)) {
@@ -124,97 +137,95 @@ class DownloadedEpisodioViewModel(
             return
         }
         if (_downloadedEpisodeIds.value.size >= MAX_DOWNLOADS) {
-            onMessage("Máximo de episodios descargados alcanzado (Límite: $MAX_DOWNLOADS).")
+            onMessage("Máximo de $MAX_DOWNLOADS episodios descargados alcanzado.")
             return
         }
 
         onMessage("Descargando '${episodio.title}'...")
-        viewModelScope.launch(Dispatchers.IO) { // Operación de red y archivo en hilo de IO.
-            // Uso un nombre de archivo que incluye el ID para evitar colisiones y facilitar la búsqueda.
-            // Sanitizo el slug para evitar caracteres no válidos en nombres de archivo.
+        viewModelScope.launch(Dispatchers.IO) { // Operaciones de red y de sistema de archivos en hilo de IO.
             val sanitizedSlug = episodio.slug.replace(Regex("[^a-zA-Z0-9.-]"), "_")
-            val fileName = "${episodio.id}_$sanitizedSlug.mp3" // Asumo que son mp3.
-            val file = File(applicationContext.filesDir, fileName)
+            val fileName = "${episodio.id}_$sanitizedSlug.mp3" // Asume extensión .mp3.
+            val file = File(applicationContext.filesDir, fileName) //
 
             try {
-                val url = URL(episodio.archiveUrl) // archiveUrl debe ser la URL directa al mp3.
+                val url = URL(episodio.archiveUrl)
                 val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 15000 // 15 segundos de timeout para conexión.
-                connection.readTimeout = 60000    // 60 segundos de timeout para lectura (descargas pueden tardar).
+                connection.connectTimeout = 15000 // 15 segundos
+                connection.readTimeout = 60000    // 60 segundos (descargas largas)
                 connection.connect()
 
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
                     throw IOException("Error del servidor al descargar: ${connection.responseCode} ${connection.responseMessage}")
                 }
 
-                // Guardo el archivo.
                 FileOutputStream(file).use { output ->
                     connection.inputStream.use { input ->
                         input.copyTo(output)
                     }
                 }
-                // Log eliminado: Timber.d("Descarga completada: ${episodio.title} a ${file.absolutePath}")
 
-                // Actualizo la lista de IDs descargados y la persisto.
                 _downloadedEpisodeIds.value = _downloadedEpisodeIds.value + episodio.id
                 saveDownloadedState()
-                // Añado el episodio a la lista de objetos descargados inmediatamente para la UI.
-                _downloadedEpisodios.value = (_downloadedEpisodios.value + episodio)
-                    .distinctBy { it.id } // Aseguro unicidad.
+                // Actualiza la lista de objetos Episodio para reflejar la nueva descarga.
+                updateDownloadedEpisodiosListFromIds() // O añadir directamente y luego ordenar si es necesario
 
-                withContext(Dispatchers.Main) { // Envío mensaje a la UI en el hilo principal.
+                withContext(Dispatchers.Main) {
                     onMessage("Descarga de '${episodio.title}' completada.")
                 }
             } catch (e: Exception) {
-                // Timber.e(e, "Error descargando episodio: ${episodio.title}") // Log eliminado
-                file.delete() // Elimino el archivo parcial si la descarga falló.
+                file.delete() // Intenta eliminar el archivo parcial si la descarga falló.
                 withContext(Dispatchers.Main) {
-                    onMessage("Error al descargar '${episodio.title}'. Revisa la conexión e inténtalo de nuevo.")
+                    onMessage("Error al descargar '${episodio.title}'.")
                 }
+                // Considerar registrar `e` en un sistema de monitoreo.
             }
         }
     }
 
     /**
-     * Elimina un episodio descargado.
-     * Esto incluye borrar el archivo físico del almacenamiento interno y
-     * quitar el episodio de la lista de seguimiento de descargas.
-     * @param episodio El episodio a eliminar.
+     * Elimina un episodio previamente descargado.
+     * Esto incluye borrar el archivo físico del almacenamiento y actualizar el estado persistido.
+     *
+     * @param episodio El [Episodio] a eliminar de las descargas.
      */
     fun deleteDownloadedEpisodio(episodio: Episodio) {
-        viewModelScope.launch(Dispatchers.IO) { // Operación de archivo en hilo de IO.
+        viewModelScope.launch(Dispatchers.IO) { // Operaciones de sistema de archivos en hilo de IO.
             val sanitizedSlug = episodio.slug.replace(Regex("[^a-zA-Z0-9.-]"), "_")
             val fileName = "${episodio.id}_$sanitizedSlug.mp3"
             val file = File(applicationContext.filesDir, fileName)
 
+            var fileDeleted = false
             if (file.exists()) {
-                if (!file.delete()) {
-                    // Log eliminado: Timber.w("No se pudo eliminar el archivo físico: ${file.absolutePath}")
-                    // Considerar informar al usuario si la eliminación del archivo falla.
-                }
+                fileDeleted = file.delete()
+                // Si file.delete() es false, podría loggearse en producción.
             } else {
-                // Log eliminado: Timber.w("El archivo a eliminar no existía (puede ser normal si ya se borró o la ruta cambió): ${file.absolutePath}")
+                // El archivo no existía, lo cual puede ser normal si ya se borró o la ruta es incorrecta.
+                // Consideramos la operación "exitosa" en términos de estado si el ID estaba en la lista.
+                fileDeleted = true // Para fines de actualizar el estado, si no existía es como si se hubiera borrado.
             }
 
-            // Aunque el archivo no exista o falle su borrado, lo quito de la lista de seguimiento.
-            if (_downloadedEpisodeIds.value.contains(episodio.id)) {
+            // Actualizar el estado solo si el archivo se eliminó (o no existía) y el ID está en la lista.
+            if (fileDeleted && _downloadedEpisodeIds.value.contains(episodio.id)) {
                 _downloadedEpisodeIds.value = _downloadedEpisodeIds.value - episodio.id
                 saveDownloadedState()
+                // Actualiza la lista de objetos Episodio para reflejar la eliminación.
                 _downloadedEpisodios.value = _downloadedEpisodios.value.filterNot { it.id == episodio.id }
-                // Log eliminado: Timber.d("Episodio '${episodio.title}' eliminado de la lista de descargas.")
             }
+            // Se podría añadir un callback `onMessage` si se quiere notificar a la UI.
         }
     }
 
     /**
      * Obtiene la ruta del archivo local para un episodio descargado.
-     * Es necesario para que el reproductor pueda acceder al archivo local.
+     * Esta ruta es necesaria para que el reproductor de audio pueda acceder al archivo.
+     *
      * @param episodeId El ID del episodio.
-     * @return La ruta absoluta al archivo si está descargado y existe, o null en caso contrario.
+     * @return La ruta absoluta al archivo si está descargado y existe en el sistema de archivos;
+     * `null` en caso contrario o si no se puede determinar el nombre del archivo.
      */
     fun getDownloadedFilePathByEpisodeId(episodeId: Int): String? {
-        // Para construir el nombre del archivo, necesito el slug del episodio.
-        // Busco el episodio en la caché de descargados o en la caché global.
+        // Para construir el nombre del archivo, se necesita el slug del episodio.
+        // Intenta encontrar el episodio en la lista de descargados o en la caché global.
         val episodio = _downloadedEpisodios.value.find { it.id == episodeId }
             ?: allAvailableEpisodesCache.find { it.id == episodeId }
 
@@ -224,15 +235,16 @@ class DownloadedEpisodioViewModel(
             val file = File(applicationContext.filesDir, fileName)
             if (file.exists()) file.absolutePath else null
         } else {
-            // Log eliminado: Timber.w("No se pudo encontrar el slug para el episodio ID $episodeId al buscar ruta de archivo.")
-            null
+            null // No se pudo encontrar el episodio para determinar el nombre del archivo.
         }
     }
 
     /**
-     * Verifica si un episodio específico está actualmente descargado.
+     * Verifica si un episodio específico está actualmente marcado como descargado.
+     * Nota: Esto no verifica si el archivo físico existe, solo si el ID está en la lista de seguimiento.
+     *
      * @param episodeId El ID del episodio a verificar.
-     * @return `true` si el episodio está en la lista de descargados, `false` en caso contrario.
+     * @return `true` si el episodio está en la lista de IDs descargados, `false` en caso contrario.
      */
     fun isEpisodeDownloaded(episodeId: Int): Boolean {
         return _downloadedEpisodeIds.value.contains(episodeId)

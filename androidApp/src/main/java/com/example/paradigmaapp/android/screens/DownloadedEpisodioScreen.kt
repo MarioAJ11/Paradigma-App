@@ -1,12 +1,25 @@
 package com.example.paradigmaapp.android.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -17,22 +30,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.paradigmaapp.android.ui.EpisodioListItem // Importa el item de episodio actualizado
-import com.example.paradigmaapp.android.viewmodel.DownloadedEpisodioViewModel // ViewModel para esta pantalla
-import com.example.paradigmaapp.android.viewmodel.QueueViewModel // ViewModel para la cola
-import com.example.paradigmaapp.model.Episodio // Modelo de datos del episodio
+import com.example.paradigmaapp.android.ui.EpisodioListItem
+import com.example.paradigmaapp.android.viewmodel.DownloadedEpisodioViewModel
+import com.example.paradigmaapp.android.viewmodel.QueueViewModel
+import com.example.paradigmaapp.model.Episodio
 import kotlinx.coroutines.launch
 
 /**
- * Pantalla que muestra los episodios que han sido descargados por el usuario.
+ * Pantalla que muestra la lista de episodios descargados por el usuario.
+ * Permite al usuario ver sus descargas, reproducirlas, gestionarlas en la cola
+ * o eliminar las descargas.
  *
- * @param downloadedEpisodioViewModel ViewModel para los episodios descargados.
- * @param queueViewModel ViewModel para gestionar acciones de la cola.
- * @param onEpisodeSelected Lambda que se invoca cuando un episodio es seleccionado para reproducción.
- * @param onBackClick Lambda para manejar la acción de retroceso.
+ * @param downloadedEpisodioViewModel ViewModel que gestiona la lógica y el estado de los episodios descargados.
+ * @param queueViewModel ViewModel para interactuar con la cola de reproducción (necesario para las acciones del [EpisodioListItem]).
+ * @param onEpisodeSelected Lambda que se invoca cuando un episodio es seleccionado para su reproducción.
+ * @param onEpisodeLongClicked Lambda que se invoca para acciones contextuales sobre un episodio (ej. ver detalles).
+ * @param onBackClick Lambda para manejar la acción de retroceso y cerrar esta pantalla.
+ *
  * @author Mario Alguacil Juárez
  */
-@OptIn(ExperimentalMaterial3Api::class) // Necesario para componentes experimentales de Material 3 como TopAppBar
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadedEpisodioScreen(
     downloadedEpisodioViewModel: DownloadedEpisodioViewModel,
@@ -41,86 +58,85 @@ fun DownloadedEpisodioScreen(
     onEpisodeLongClicked: (Episodio) -> Unit,
     onBackClick: () -> Unit
 ) {
-    // Observa la lista de episodios descargados desde el ViewModel.
     val downloadedEpisodios by downloadedEpisodioViewModel.downloadedEpisodios.collectAsState()
-    // Observa los IDs de los episodios en cola para el estado en EpisodioListItem.
-    val queueEpisodeIds by queueViewModel.queueEpisodeIds.collectAsState()
+    val queueEpisodeIds by queueViewModel.queueEpisodeIds.collectAsState() // Necesario para el estado 'isInQueue' de EpisodioListItem
 
-    // Para el Snackbar, para mostrar mensajes
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }, // Host para los Snackbars
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "Mis Descargas", // Título de la pantalla
+                        text = "Mis Descargas",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface // Color del texto del título
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) { // Botón para volver atrás
+                    IconButton(onClick = onBackClick) {
                         Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack, // Icono de flecha
-                            contentDescription = "Volver", // Descripción para accesibilidad
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant // Color del icono
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors( // Colores de la TopAppBar
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface // Color de fondo de la TopAppBar
                 )
             )
         }
-    ) { innerPadding -> // Padding proporcionado por el Scaffold
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding) // Aplica el padding del Scaffold
-                .background(MaterialTheme.colorScheme.background) // Color de fondo de la pantalla
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            // Muestra un mensaje si no hay episodios descargados
             if (downloadedEpisodios.isEmpty()) {
+                // Muestra un mensaje si no hay episodios descargados.
                 Box(
-                    modifier = Modifier.fillMaxSize().padding(16.dp), // Padding alrededor del texto
-                    contentAlignment = Alignment.Center // Centra el contenido
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "No tienes episodios descargados.",
-                        style = MaterialTheme.typography.bodyLarge, // Estilo del texto
-                        color = MaterialTheme.colorScheme.onBackground, // Color del texto
-                        textAlign = TextAlign.Center // Alineación del texto
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), // Un color más sutil para el texto vacío
+                        textAlign = TextAlign.Center
                     )
                 }
             } else {
-                // Lista de episodios descargados
+                // Lista de episodios descargados.
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 8.dp) // Padding vertical para la lista
+                    contentPadding = PaddingValues(vertical = 8.dp, horizontal = 8.dp) // Padding para la lista
                 ) {
-                    items(downloadedEpisodios, key = { it.id }) { episodio ->
-                        // Cada item de la lista es un EpisodioListItem.
+                    items(downloadedEpisodios, key = { episodio -> episodio.id }) { episodio ->
                         EpisodioListItem(
                             episodio = episodio,
+                            onPlayEpisode = { onEpisodeSelected(it) },
                             onEpisodeLongClick = { onEpisodeLongClicked(it) },
-                            onPlayEpisode = { onEpisodeSelected(it) }, // Acción de reproducir al hacer clic
-                            onAddToQueue = { queueViewModel.addEpisodeToQueue(it) }, // Añadir a la cola
-                            onRemoveFromQueue = { queueViewModel.removeEpisodeFromQueue(it) }, // Quitar de la cola
-                            onDownloadEpisode = { _, onMsgCallback -> // Acción de descargar (ya está descargado)
-                                val message = "Este episodio ya está descargado."
-                                onMsgCallback(message) // Llama al callback con el mensaje
-                                coroutineScope.launch { // Muestra el Snackbar
+                            onAddToQueue = { queueViewModel.addEpisodeToQueue(it) },
+                            onRemoveFromQueue = { queueViewModel.removeEpisodeFromQueue(it) },
+                            onDownloadEpisode = { _, onMsgCallback ->
+                                // El episodio ya está descargado, informar al usuario.
+                                val message = "'${episodio.title}' ya está descargado."
+                                onMsgCallback(message) // Permite al llamador (si lo hubiera) saber del mensaje.
+                                coroutineScope.launch {
                                     snackbarHostState.showSnackbar(message)
                                 }
                             },
-                            onDeleteDownload = { downloadedEpisodioViewModel.deleteDownloadedEpisodio(it) }, // Eliminar descarga
-                            isDownloaded = true, // Todos los items aquí están descargados
-                            isInQueue = queueEpisodeIds.contains(episodio.id), // Verifica si está en la cola
-                            modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp) // Padding para cada item
+                            onDeleteDownload = { downloadedEpisodioViewModel.deleteDownloadedEpisodio(it) },
+                            isDownloaded = true, // Todos los episodios en esta pantalla están descargados.
+                            isInQueue = queueEpisodeIds.contains(episodio.id), // Verifica si el episodio está en la cola.
+                            modifier = Modifier.padding(vertical = 4.dp) // Padding vertical para cada ítem
                         )
                     }
                 }

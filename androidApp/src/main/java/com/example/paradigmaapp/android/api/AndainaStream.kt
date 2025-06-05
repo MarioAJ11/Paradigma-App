@@ -2,157 +2,172 @@ package com.example.paradigmaapp.android.api
 
 import android.content.Context
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import timber.log.Timber
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.withContext
-import io.ktor.client.call.body
-import io.ktor.client.request.get
-import io.ktor.http.takeFrom
-import io.ktor.http.parameters
-import io.ktor.http.path
 import com.example.paradigmaapp.api.ktorClient
 import com.example.paradigmaapp.model.RadioInfo
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.http.path
+import io.ktor.http.takeFrom
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
- * Clase responsable de gestionar la reproducción del stream de audio de Andaina.
- * Utiliza ExoPlayer para la reproducción y Ktor para obtener información adicional de la radio.
+ * Gestiona la reproducción del stream de audio de Andaina FM y la obtención de metadatos relacionados.
+ * Utiliza [ExoPlayer] para la reproducción del stream y [ktorClient] para las llamadas a la API
+ * de información de la radio.
  *
- * @property context El contexto de la aplicación necesario para inicializar el ExoPlayer.
+ * Es importante llamar a [release] cuando esta instancia ya no sea necesaria para liberar
+ * los recursos de ExoPlayer y cancelar las corutinas.
  *
+ * @property context El [Context] de la aplicación, necesario para inicializar ExoPlayer.
  * @author Mario Alguacil Juárez
  */
 class AndainaStream(private val context: Context) {
 
     private var _exoPlayer: ExoPlayer? = null
     /**
-     * Acceso público al [ExoPlayer] interno. Puede ser nulo si aún no se ha inicializado o ya se ha liberado.
+     * La instancia de [ExoPlayer] utilizada para la reproducción del stream.
+     * Puede ser `null` si [release] ha sido llamado o si la inicialización falló.
      */
     val exoPlayer: ExoPlayer? get() = _exoPlayer
 
+    // URLs para el stream de audio y la API de información de la radio.
     private val streamUrl = "https://radio.andaina.net/8042/stream"
     private val apiUrl = "https://radio.andaina.net/"
 
-    // CoroutineScope para gestionar las corutinas dentro de la clase
-    private val scope = CoroutineScope(Dispatchers.IO + Job())
-
-    // Usa el cliente Ktor definido en NetworkModule.kt (se asume su existencia)
-    private val client = ktorClient
+    // CoroutineScope para las operaciones asíncronas de esta clase.
+    // Se utiliza SupervisorJob para que el fallo de una corutina hija no cancele el scope entero.
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineName("AndainaStreamScope"))
 
     init {
-        _exoPlayer = ExoPlayer.Builder(context).build().also {
-            Timber.d("AndainaStream: ExoPlayer instance created.")
+        try {
+            _exoPlayer = ExoPlayer.Builder(context).build()
+        } catch (e: Exception) {
+            // Considerar registrar este error en un sistema de monitoreo en producción.
+            // Por ejemplo: Crashlytics.log("Failed to initialize ExoPlayer for AndainaStream")
+            // Crashlytics.recordException(e)
+            _exoPlayer = null // Asegurar que _exoPlayer es null si la inicialización falla.
         }
     }
 
     /**
-     * Inicia la reproducción del stream de audio.
-     * Configura el [ExoPlayer] con el [MediaItem] del stream y comienza la reproducción.
+     * Inicia o reanuda la reproducción del stream de audio.
+     * Si ExoPlayer no está preparado, configura el [MediaItem] y lo prepara.
      */
     fun play() {
         _exoPlayer?.let { player ->
-            val mediaItem = MediaItem.fromUri(streamUrl)
-            player.setMediaItem(mediaItem)
-            player.prepare()
+            if (player.playbackState == Player.STATE_IDLE || player.playbackState == Player.STATE_ENDED) {
+                val mediaItem = MediaItem.fromUri(streamUrl)
+                player.setMediaItem(mediaItem)
+                player.prepare()
+            }
             player.play()
-            Timber.i("AndainaStream: Started playing stream from $streamUrl.")
-        } ?: Timber.w("AndainaStream: play() called but ExoPlayer is null.")
+        }
     }
 
     /**
      * Pausa la reproducción del stream de audio.
-     * Pausa el [ExoPlayer] si está inicializado.
      */
     fun pause() {
         _exoPlayer?.pause()
-        Timber.i("AndainaStream: Paused stream playback.")
     }
 
     /**
-     * Detiene la reproducción del stream de audio y libera los [MediaItem]s.
-     * Detiene el [ExoPlayer] y limpia la lista de elementos multimedia.
+     * Detiene la reproducción del stream y limpia los [MediaItem]s.
+     * El reproductor puede ser preparado y reutilizado después de esto.
      */
     fun stop() {
         _exoPlayer?.stop()
-        _exoPlayer?.clearMediaItems()
-        Timber.i("AndainaStream: Stopped stream playback and cleared media items.")
+        _exoPlayer?.clearMediaItems() // Limpia la lista de reproducción actual.
     }
 
     /**
-     * Libera todos los recursos asociados a la instancia de [ExoPlayer].
-     * Es crucial llamar a este método cuando la instancia de [AndainaStream] ya no es necesaria
-     * para evitar fugas de memoria. También cancela las corutinas lanzadas en este scope.
+     * Libera todos los recursos asociados con esta instancia de [AndainaStream],
+     * incluyendo el [ExoPlayer] y cancelando todas las corutinas activas en su [scope].
+     * Este método debe ser llamado cuando la instancia ya no es necesaria para prevenir fugas de memoria.
      */
     fun release() {
         _exoPlayer?.release()
         _exoPlayer = null
-        Timber.i("AndainaStream: ExoPlayer resources released.")
-        scope.cancel() // Cancela las corutinas cuando se libera la clase
-        // Si el cliente Ktor es un singleton global, NO cerrar aquí.
-        // client.close() // No descomentar si ktorClient es un singleton global
+        scope.cancel() // Cancela todas las corutinas lanzadas por este scope.
     }
 
     /**
-     * Devuelve el estado actual de reproducción del [ExoPlayer].
-     * @return `true` si el stream se está reproduciendo, `false` en caso contrario o si [ExoPlayer] es null.
+     * Verifica si el stream se está reproduciendo actualmente.
+     *
+     * @return `true` si el stream se está reproduciendo, `false` en caso contrario o si ExoPlayer es `null`.
      */
     fun isPlaying(): Boolean {
         return _exoPlayer?.isPlaying ?: false
     }
 
     /**
-     * Obtiene la información actual de la radio desde la API utilizando Ktor.
-     * Esta función es suspendida y debe llamarse desde una corutina.
-     * Realiza una petición GET a la API y deserializa la respuesta JSON a un objeto [RadioInfo].
+     * Obtiene la información actual de la radio (ej. canción actual, oyentes) desde la API de Andaina.
+     * Esta función es suspendida y debe ser llamada desde una corutina.
      *
-     * @return Un objeto [RadioInfo] si la llamada a la API fue exitosa y la deserialización correcta,
-     * o `null` si ocurrió un error de red, HTTP no exitoso, o deserialización.
+     * @return Un objeto [RadioInfo] si la llamada a la API y la deserialización son exitosas;
+     * `null` si ocurre algún error (red, HTTP, deserialización).
      */
     suspend fun getRadioInfo(): RadioInfo? = withContext(Dispatchers.IO) {
         try {
-            // Realiza la petición GET usando el cliente Ktor
-            val response = client.get {
-                // Configura la URL para la petición usando el DSL de Ktor
+            val response = ktorClient.get {
                 url {
-                    // Toma la URL base del campo apiUrl
                     takeFrom(apiUrl)
-                    // Añade el path específico para el endpoint get_info.php
-                    path("cp/get_info.php")
-                    // Añade los parámetros de la query
-                    parameters {
-                        append("p", "8042")
-                    }
+                    path("cp/get_info.php") //
+                    parameters.append("p", "8042") //
                 }
-                // Ktor lanza excepciones para respuestas no exitosas por defecto con el plugin de ContentNegotiation,
-                // por lo que solo necesitamos manejar la deserialización aquí.
             }
-            // Deserializa el cuerpo de la respuesta a un objeto RadioInfo
             response.body<RadioInfo>()
         } catch (e: Exception) {
-            // Manejar excepciones de red, respuestas HTTP con error,
-            // deserialización u otras
-            Timber.e(e, "AndainaStream: Error fetching radio info from API using Ktor.")
-            null
+            // En producción, este error debería ser registrado en un sistema de monitoreo.
+            // Ejemplo: Crashlytics.log("Error fetching Andaina radio info: ${e.message}")
+            // Crashlytics.recordException(e)
+            null // Devuelve null en caso de cualquier error.
         }
     }
 
     /**
      * Lanza una corutina para obtener la información de la radio en segundo plano.
-     * Los resultados se loggean. Para actualizar la UI, se necesitaría un mecanismo
-     * de comunicación entre el hilo de fondo y el hilo principal.
+     * Esta función es principalmente para propósitos de ejemplo o para iniciar una
+     * actualización de datos sin esperar directamente el resultado.
+     * Para actualizar la UI, se requeriría un mecanismo de callback o LiveData/StateFlow.
      */
-    fun fetchRadioInfo() {
+    fun fetchRadioInfoInBackground() {
         scope.launch {
             val info = getRadioInfo()
-            info?.let {
-                Timber.i("AndainaStream: Radio Info - Title: ${it.title}, Listeners: ${it.onlineListeners}")
-            } ?: run {
-                Timber.w("AndainaStream: Could not fetch radio info or it was null.")
+            if (info != null) {
+                // Aquí podrías, por ejemplo, postear el resultado a un StateFlow si esta clase
+                // fuera observada por un ViewModel, o emitir un evento.
+                // Ejemplo: _radioInfoStateFlow.value = info
+            } else {
+                // Manejar el caso en que la info no se pudo obtener.
             }
         }
+    }
+
+    /**
+     * Configura un listener para los eventos del reproductor.
+     * Es responsabilidad del llamador añadir y quitar este listener.
+     *
+     * @param listener El [Player.Listener] a añadir.
+     */
+    fun addListener(listener: Player.Listener) {
+        _exoPlayer?.addListener(listener)
+    }
+
+    /**
+     * Elimina un listener previamente añadido de los eventos del reproductor.
+     *
+     * @param listener El [Player.Listener] a eliminar.
+     */
+    fun removeListener(listener: Player.Listener) {
+        _exoPlayer?.removeListener(listener)
     }
 }
