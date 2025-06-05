@@ -1,6 +1,7 @@
-package com.example.paradigmaapp.android.ui // O com.example.paradigmaapp.android.screens
+package com.example.paradigmaapp.android.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -42,7 +43,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Opción de Streaming
@@ -74,18 +75,31 @@ fun SettingsScreen(
                     }
                 )
             }
-            TextButton(
+
+            Button(
                 onClick = { settingsViewModel.setThemePreference(null) },
+                modifier = Modifier
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
             ) {
                 Text("Seguir tema del sistema")
             }
 
             Divider()
 
-            // Enlace a la web
-            TextButton(
+            Button(
                 onClick = { uriHandler.openUri("https://paradigmamedia.org/") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
             ) {
                 Text("Visitar web de Paradigma Media")
             }

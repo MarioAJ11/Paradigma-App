@@ -1,6 +1,5 @@
 package com.example.paradigmaapp.android.navigation
 
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,23 +18,9 @@ import androidx.navigation.navArgument
 import com.example.paradigmaapp.android.audio.AudioPlayer
 import com.example.paradigmaapp.android.audio.VolumeControl
 import com.example.paradigmaapp.android.screens.*
-import com.example.paradigmaapp.android.ui.SettingsScreen
 import com.example.paradigmaapp.android.viewmodel.*
 import kotlinx.coroutines.launch
 
-/**
- * Define el grafo de navegación principal de la aplicación.
- * Este Composable configura el `NavHost` para la navegación entre pantallas.
- * Utiliza un `BottomSheetScaffold` para mostrar el `VolumeControl` en un panel
- * que se puede expandir o colapsar desde la parte inferior.
- *
- * @param navController El [NavHostController] que gestiona la pila de navegación.
- * @param viewModelFactory La factoría para crear instancias de [ViewModel].
- * @param mainViewModel El [MainViewModel] principal para el estado global.
- * @param searchViewModel El [SearchViewModel] para la búsqueda.
- *
- * @author Mario Alguacil Juárez
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NavGraph(
@@ -57,6 +42,8 @@ fun NavGraph(
     val queueViewModel = mainViewModel.queueViewModel
     val downloadedViewModel = mainViewModel.downloadedViewModel
     val onGoingViewModel = mainViewModel.onGoingViewModel
+    val settingsViewModel: SettingsViewModel = viewModel(factory = viewModelFactory)
+
 
     BottomSheetScaffold(
         scaffoldState = volumeBottomSheetScaffoldState,
@@ -82,7 +69,6 @@ fun NavGraph(
                 startDestination = Screen.Home.route,
                 modifier = Modifier.weight(1f)
             ) {
-                // Definición de la pantalla de Inicio (HomeScreen)
                 composable(Screen.Home.route) {
                     HomeScreen(
                         mainViewModel = mainViewModel,
@@ -92,7 +78,6 @@ fun NavGraph(
                     )
                 }
 
-                // Definición de la pantalla de Programa (ProgramaScreen)
                 composable(
                     route = Screen.Programa.route,
                     arguments = listOf(
@@ -100,11 +85,9 @@ fun NavGraph(
                         navArgument("programaNombre") { type = NavType.StringType }
                     )
                 ) { navBackStackEntry ->
-                    val arguments = navBackStackEntry.arguments
-                    val programaIdFromArgs = arguments?.getInt("programaId") ?: -1
                     val programaViewModel: ProgramaViewModel = viewModel(
-                        key = "programa_vm_$programaIdFromArgs",
-                        viewModelStoreOwner = navBackStackEntry, // Usar navBackStackEntry como owner
+                        key = "programa_vm_${navBackStackEntry.arguments?.getInt("programaId")}",
+                        viewModelStoreOwner = navBackStackEntry,
                         factory = viewModelFactory
                     )
                     ProgramaScreen(
@@ -119,7 +102,6 @@ fun NavGraph(
                     )
                 }
 
-                // Definición de la pantalla de Búsqueda (SearchScreen)
                 composable(Screen.Search.route) {
                     SearchScreen(
                         searchViewModel = searchViewModel,
@@ -134,7 +116,6 @@ fun NavGraph(
                         onBackClick = { navController.popBackStack() }
                     )
                 }
-                // Definición de la pantalla de Descargas (DownloadedEpisodioScreen)
                 composable(Screen.Downloads.route) {
                     DownloadedEpisodioScreen(
                         downloadedEpisodioViewModel = downloadedViewModel,
@@ -146,7 +127,6 @@ fun NavGraph(
                         onBackClick = { navController.popBackStack() }
                     )
                 }
-                // Definición de la pantalla de Cola (QueueScreen)
                 composable(Screen.Queue.route) {
                     QueueScreen(
                         queueViewModel = queueViewModel,
@@ -158,7 +138,6 @@ fun NavGraph(
                         onBackClick = { navController.popBackStack() }
                     )
                 }
-                // Definición de la pantalla de "Seguir Escuchando" (OnGoingEpisodioScreen)
                 composable(Screen.OnGoing.route) {
                     OnGoingEpisodioScreen(
                         onGoingEpisodioViewModel = onGoingViewModel,
@@ -172,7 +151,6 @@ fun NavGraph(
                     )
                 }
 
-                // Definición de la pantalla de Detalles del Episodio (EpisodeDetailScreen)
                 composable(
                     route = Screen.EpisodeDetail.route,
                     arguments = listOf(
@@ -181,7 +159,7 @@ fun NavGraph(
                 ) { navBackStackEntry ->
                     val episodeDetailViewModel: EpisodeDetailViewModel = viewModel(
                         key = "episode_detail_vm_${navBackStackEntry.arguments?.getInt("episodeId")}",
-                        viewModelStoreOwner = navBackStackEntry, // Usar navBackStackEntry como owner
+                        viewModelStoreOwner = navBackStackEntry,
                         factory = viewModelFactory
                     )
                     EpisodeDetailScreen(
@@ -193,20 +171,14 @@ fun NavGraph(
                     )
                 }
 
-                // NUEVA NAVEGACIÓN PARA LA PANTALLA DE AJUSTES
-                composable(Screen.Settings.route) { navBackStackEntry ->
-                    val settingsViewModel: SettingsViewModel = viewModel(
-                        key = "settings_vm", // Clave única para el ViewModel de Ajustes
-                        viewModelStoreOwner = navBackStackEntry, // Usar navBackStackEntry como owner
-                        factory = viewModelFactory
-                    )
+                composable(Screen.Settings.route) {
                     SettingsScreen(
                         settingsViewModel = settingsViewModel,
                         onBackClick = { navController.popBackStack() }
                     )
                 }
 
-            } // Fin del NavHost
+            }
 
             AudioPlayer(
                 activePlayer = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer else mainViewModel.andainaStreamPlayer.exoPlayer,
@@ -272,7 +244,6 @@ fun NavGraph(
                     }
                 },
                 onSettingsClick = {
-                    // Navegar a la nueva pantalla de Ajustes
                     navController.navigate(Screen.Settings.route) {
                         launchSingleTop = true
                     }
