@@ -28,9 +28,6 @@ import kotlinx.coroutines.launch
  * Este Composable configura el `NavHost` para la navegación entre pantallas.
  * Utiliza un `BottomSheetScaffold` para mostrar el `VolumeControl` en un panel
  * que se puede expandir o colapsar desde la parte inferior.
- * La lógica para mostrar/ocultar el panel de volumen se ha ajustado para evitar
- * el uso de la función `hide()` y así prevenir un `IllegalStateException` si
- * `skipHiddenState` es true (lo cual se asume si `rememberSheetState` no es configurable).
  *
  * @param navController El [NavHostController] que gestiona la pila de navegación.
  * @param viewModelFactory La factoría para crear instancias de [ViewModel].
@@ -47,21 +44,16 @@ fun NavGraph(
     mainViewModel: MainViewModel,
     searchViewModel: SearchViewModel
 ) {
-    val coroutineScope = rememberCoroutineScope()
 
+    val coroutineScope = rememberCoroutineScope()
     val currentPlayingEpisode by mainViewModel.currentPlayingEpisode.collectAsState()
     val isPodcastPlaying by mainViewModel.isPodcastPlaying.collectAsState()
     val isAndainaPlaying by mainViewModel.isAndainaPlaying.collectAsState()
     val isPlayingGeneral = if (currentPlayingEpisode != null) isPodcastPlaying else isAndainaPlaying
     val episodeProgress by mainViewModel.podcastProgress.collectAsState()
     val isAndainaStreamActive by mainViewModel.isAndainaStreamActive.collectAsState()
-
-    // Usamos rememberBottomSheetScaffoldState() directamente.
-    // Esto implicará que su SheetState interno probablemente tenga skipHiddenState = true.
+    val volumeFromViewModel by mainViewModel.currentVolume.collectAsState()
     val volumeBottomSheetScaffoldState = rememberBottomSheetScaffoldState()
-
-    var showSettingsDialog by remember { mutableStateOf(false) }
-
     val queueViewModel = mainViewModel.queueViewModel
     val downloadedViewModel = mainViewModel.downloadedViewModel
     val onGoingViewModel = mainViewModel.onGoingViewModel
@@ -69,30 +61,14 @@ fun NavGraph(
     BottomSheetScaffold(
         scaffoldState = volumeBottomSheetScaffoldState,
         sheetContent = {
-            // Tu Composable VolumeControl se coloca aquí.
             VolumeControl(
                 onVolumeChanged = { newVolume ->
-                    val activePlayer = if (currentPlayingEpisode != null) {
-                        mainViewModel.podcastExoPlayer
-                    } else {
-                        mainViewModel.andainaStreamPlayer.exoPlayer
-                    }
-                    activePlayer?.let { player ->
-                        player.volume = newVolume.coerceIn(0f, 1f)
-                    }
+                    mainViewModel.setVolume(newVolume)
                 },
-                currentVolume = (if (currentPlayingEpisode != null) {
-                    mainViewModel.podcastExoPlayer.volume
-                } else {
-                    mainViewModel.andainaStreamPlayer.exoPlayer?.volume ?: 0f
-                })
+                currentVolume = volumeFromViewModel
             )
         },
-        // Establecemos peekHeight a 0.dp. Cuando el sheet esté en estado PartiallyExpanded,
-        // debería ser invisible si su contenido no fuerza una altura mayor.
         sheetPeekHeight = 0.dp,
-        // Podrías considerar sheetSwipeEnabled = false si no quieres que el usuario lo deslice manualmente
-        // y solo controlarlo por el botón. Por ahora, lo dejamos habilitado.
         containerColor = MaterialTheme.colorScheme.background
     )  { paddingValuesDelBottomSheet ->
         Column(
@@ -128,7 +104,7 @@ fun NavGraph(
                     val programaIdFromArgs = arguments?.getInt("programaId") ?: -1
                     val programaViewModel: ProgramaViewModel = viewModel(
                         key = "programa_vm_$programaIdFromArgs",
-                        viewModelStoreOwner = navBackStackEntry,
+                        viewModelStoreOwner = navBackStackEntry, // Usar navBackStackEntry como owner
                         factory = viewModelFactory
                     )
                     ProgramaScreen(
@@ -205,7 +181,7 @@ fun NavGraph(
                 ) { navBackStackEntry ->
                     val episodeDetailViewModel: EpisodeDetailViewModel = viewModel(
                         key = "episode_detail_vm_${navBackStackEntry.arguments?.getInt("episodeId")}",
-                        viewModelStoreOwner = navBackStackEntry,
+                        viewModelStoreOwner = navBackStackEntry, // Usar navBackStackEntry como owner
                         factory = viewModelFactory
                     )
                     EpisodeDetailScreen(
@@ -216,6 +192,20 @@ fun NavGraph(
                         onBackClick = { navController.popBackStack() }
                     )
                 }
+
+                // NUEVA NAVEGACIÓN PARA LA PANTALLA DE AJUSTES
+                composable(Screen.Settings.route) { navBackStackEntry ->
+                    val settingsViewModel: SettingsViewModel = viewModel(
+                        key = "settings_vm", // Clave única para el ViewModel de Ajustes
+                        viewModelStoreOwner = navBackStackEntry, // Usar navBackStackEntry como owner
+                        factory = viewModelFactory
+                    )
+                    SettingsScreen(
+                        settingsViewModel = settingsViewModel,
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
             } // Fin del NavHost
 
             AudioPlayer(
@@ -231,15 +221,12 @@ fun NavGraph(
                 onEpisodeInfoClick = { episodio ->
                     navController.navigate(Screen.EpisodeDetail.createRoute(episodio.id))
                 },
-                // Lógica alternativa y más explícita para onVolumeIconClick
                 onVolumeIconClick = {
                     coroutineScope.launch {
                         val sheetState = volumeBottomSheetScaffoldState.bottomSheetState
                         if (sheetState.currentValue == SheetValue.Expanded) {
-                            sheetState.partialExpand() // Intenta colapsar a peekHeight (0.dp)
+                            sheetState.partialExpand()
                         } else {
-                            // Si está PartiallyExpanded (en 0.dp) o Hidden (aunque no deberíamos llegar a Hidden
-                            // si skipHiddenState=true), lo expandimos.
                             sheetState.expand()
                         }
                     }
@@ -253,25 +240,44 @@ fun NavGraph(
                         navController.navigate(Screen.Search.route) {
                             popUpTo(Screen.Home.route) { saveState = true }
                             launchSingleTop = true
+                            restoreState = true
                         }
                     }
                 },
-                onOnGoingClick = { navController.navigate(Screen.OnGoing.route) { popUpTo(Screen.Home.route); launchSingleTop = true } },
-                onDownloadedClick = { navController.navigate(Screen.Downloads.route) { popUpTo(Screen.Home.route); launchSingleTop = true } },
-                onQueueClick = { navController.navigate(Screen.Queue.route) { popUpTo(Screen.Home.route); launchSingleTop = true } },
-                onSettingsClick = { showSettingsDialog = true }
+                onOnGoingClick = {
+                    if (navController.currentDestination?.route != Screen.OnGoing.route) {
+                        navController.navigate(Screen.OnGoing.route) {
+                            popUpTo(Screen.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onDownloadedClick = {
+                    if (navController.currentDestination?.route != Screen.Downloads.route) {
+                        navController.navigate(Screen.Downloads.route) {
+                            popUpTo(Screen.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onQueueClick = {
+                    if (navController.currentDestination?.route != Screen.Queue.route) {
+                        navController.navigate(Screen.Queue.route) {
+                            popUpTo(Screen.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onSettingsClick = {
+                    // Navegar a la nueva pantalla de Ajustes
+                    navController.navigate(Screen.Settings.route) {
+                        launchSingleTop = true
+                    }
+                }
             )
         }
-    }
-
-    if (showSettingsDialog) {
-        SettingsScreen(
-            onDismissRequest = { showSettingsDialog = false },
-            isStreamActive = isAndainaStreamActive,
-            onStreamActiveChanged = {
-                mainViewModel.toggleAndainaStreamActive()
-                showSettingsDialog = false
-            }
-        )
     }
 }

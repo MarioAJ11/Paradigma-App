@@ -91,8 +91,10 @@ class ViewModelFactory(
                 DownloadedEpisodioViewModel(appPreferences, wordpressDataSource, applicationContext) as T
             }
             modelClass.isAssignableFrom(OnGoingEpisodioViewModel::class.java) -> {
-                // OnGoingEpisodioViewModel necesita AppPreferences y EpisodioRepository.
                 OnGoingEpisodioViewModel(appPreferences, wordpressDataSource) as T
+            }
+            modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
+                SettingsViewModel(appPreferences) as T
             }
             else -> throw IllegalArgumentException("Clase ViewModel desconocida en ViewModelFactory: ${modelClass.name}")
         }

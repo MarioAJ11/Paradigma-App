@@ -105,12 +105,21 @@ class MainViewModel(
     // Job para la actualización periódica del progreso del reproductor.
     private var progressUpdateJob: Job? = null
 
+    // Volumen del controlador, lo guarda.
+    private val _currentVolume = MutableStateFlow(1f) // Volumen inicial (0.0f a 1.0f)
+    val currentVolume: StateFlow<Float> = _currentVolume.asStateFlow()
+
+
     init {
         setupPodcastPlayerListeners()
         setupAndainaPlayerListeners()
         loadInitialProgramas()
         loadInitialData()
         startProgressUpdates()
+
+        // Inicializar el volumen del player y el StateFlow
+        val initialPlayerVolume = podcastExoPlayer.volume
+        _currentVolume.value = initialPlayerVolume
 
         // Observo cambios en el episodio actual para guardar su ID y gestionar la reproducción del stream.
         viewModelScope.launch {
@@ -136,6 +145,19 @@ class MainViewModel(
                     andainaStreamPlayer.stop() // Desactivar y detener stream.
                 }
             }
+        }
+    }
+
+    /**
+     * Establece el volumen del reproductor activo y actualiza el StateFlow.
+     */
+    fun setVolume(volume: Float) {
+        val newVolume = volume.coerceIn(0f, 1f)
+        _currentVolume.value = newVolume
+        if (_currentPlayingEpisode.value != null) {
+            podcastExoPlayer.volume = newVolume
+        } else {
+            andainaStreamPlayer.exoPlayer?.volume = newVolume
         }
     }
 
@@ -180,6 +202,10 @@ class MainViewModel(
                     }
                 }
             }
+
+            override fun onVolumeChanged(volume: Float) {
+                _currentVolume.value = volume
+            }
         })
     }
 
@@ -189,8 +215,15 @@ class MainViewModel(
             override fun onPlayerError(error: PlaybackException) {
                 _hasStreamLoadFailed.value = true // Marco que el stream falló al cargar.
             }
+
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isAndainaPlaying.value = isPlaying // Actualizo el estado de reproducción del stream.
+            }
+
+            override fun onVolumeChanged(volume: Float) {
+                if (_currentPlayingEpisode.value == null) { // Solo actualizar si Andaina es el activo
+                    _currentVolume.value = volume
+                }
             }
         })
     }

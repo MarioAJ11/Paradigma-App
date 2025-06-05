@@ -5,13 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
-// import androidx.media3.common.BuildConfig // BuildConfig de Media3 no suele usarse así. Usar el de la app.
 import com.example.paradigmaapp.android.data.AppPreferences
 import com.example.paradigmaapp.android.viewmodel.MainViewModel
 import com.example.paradigmaapp.android.viewmodel.SearchViewModel
 import com.example.paradigmaapp.android.viewmodel.ViewModelFactory
 import com.example.paradigmaapp.repository.WordpressService
-// import timber.log.Timber // Timber eliminado según solicitud
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.example.paradigmaapp.android.viewmodel.SettingsViewModel
 
 /**
  * Esta es la actividad principal y punto de entrada de mi aplicación Android.
@@ -23,38 +24,35 @@ import com.example.paradigmaapp.repository.WordpressService
  *
  * @author Mario Alguacil Juárez
  */
+
 class MainActivity : ComponentActivity() {
 
-    // Mi factory personalizada para crear ViewModels con sus dependencias.
     private lateinit var viewModelFactory: ViewModelFactory
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Habilito que la UI se dibuje de borde a borde (debajo de las barras de sistema).
         enableEdgeToEdge()
 
-        // Inicializo las dependencias básicas que necesitará mi ViewModelFactory.
-        val appPreferences = AppPreferences(applicationContext)
-        // Esta es la instancia de mi implementación concreta del servicio de datos.
+        val appPreferencesInstance = AppPreferences(applicationContext)
         val wordpressServiceInstance = WordpressService()
 
-        // Creo la instancia de mi ViewModelFactory, pasándole las dependencias.
         viewModelFactory = ViewModelFactory(
-            appPreferences = appPreferences,
+            appPreferences = appPreferencesInstance,
             wordpressDataSource = wordpressServiceInstance,
             applicationContext = applicationContext
         )
 
-        // Establezco el contenido de la actividad usando Jetpack Compose.
         setContent {
-            // Aplico mi tema personalizado.
-            Theme {
-                // Obtengo las instancias de mis ViewModels principales usando la factory.
-                // El ViewModelProvider se encarga del ciclo de vida de estos ViewModels.
+            // Obtener el SettingsViewModel con el scope de la Activity
+            // para que sea la misma instancia o al menos su StateFlow se actualice correctamente.
+            val settingsViewModel: SettingsViewModel = ViewModelProvider(this, viewModelFactory)[SettingsViewModel::class.java]
+            val manualDarkThemeSetting by settingsViewModel.isManuallySetToDarkTheme.collectAsState()
+
+            // Pasar la preferencia manual al Composable Theme
+            Theme(manualDarkThemeSetting = manualDarkThemeSetting) {
                 val mainViewModel: MainViewModel = ViewModelProvider(this, viewModelFactory)[MainViewModel::class.java]
                 val searchViewModel: SearchViewModel = ViewModelProvider(this, viewModelFactory)[SearchViewModel::class.java]
 
-                // Llamo a mi Composable raíz, pasándole la factory y los ViewModels.
                 ParadigmaApp(
                     viewModelFactory = viewModelFactory,
                     mainViewModel = mainViewModel,

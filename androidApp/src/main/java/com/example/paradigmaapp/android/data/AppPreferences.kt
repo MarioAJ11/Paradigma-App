@@ -33,6 +33,25 @@ class AppPreferences(context: Context) {
         private const val PREF_EPISODE_POSITIONS = "episodePositions_v2"
         private const val PREF_EPISODE_QUEUE_IDS = "episodeQueueIds_v2"
         private const val PREF_DOWNLOADED_EPISODE_IDS = "downloadedEpisodeIds_v2"
+        private const val PREF_MANUALLY_SET_DARK_THEME = "manuallySetDarkTheme_v1"
+    }
+
+    fun saveIsManuallySetDarkTheme(isDark: Boolean?) {
+        val editor = prefs.edit()
+        if (isDark == null) {
+            editor.remove(PREF_MANUALLY_SET_DARK_THEME)
+        } else {
+            editor.putBoolean(PREF_MANUALLY_SET_DARK_THEME, isDark)
+        }
+        editor.apply()
+    }
+
+    fun loadIsManuallySetDarkTheme(): Boolean? {
+        return if (prefs.contains(PREF_MANUALLY_SET_DARK_THEME)) {
+            prefs.getBoolean(PREF_MANUALLY_SET_DARK_THEME, false)
+        } else {
+            null
+        }
     }
 
     fun saveEpisodePosition(episodeId: Int, positionMillis: Long) {

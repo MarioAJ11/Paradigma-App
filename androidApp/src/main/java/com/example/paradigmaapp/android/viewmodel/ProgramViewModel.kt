@@ -69,51 +69,64 @@ class ProgramaViewModel(
      */
     fun loadProgramaConEpisodios() {
         if (programaId == -1) {
-            // Doble verificación, aunque init ya lo hace, por si se llama externamente.
             _error.value = "ID de programa no válido para cargar episodios."
-            _isLoadingEpisodios.value = false
-            _isLoadingPrograma.value = false
+            // ...
             return
         }
 
         viewModelScope.launch {
             _isLoadingPrograma.value = true
             _isLoadingEpisodios.value = true
-            _error.value = null // Limpio errores anteriores al iniciar una nueva carga.
+            _error.value = null
 
             try {
-                // Obtengo todos los programas para encontrar el actual con todos sus detalles
-                // (esto podría optimizarse si tuviera un endpoint para un solo programa por ID con toda su info).
                 val todosLosProgramas = programaRepository.getProgramas()
                 val programaActualCompleto = todosLosProgramas.find { it.id == programaId }
+                _isLoadingPrograma.value = false // Detalles del programa cargados (o fallback)
 
                 if (programaActualCompleto != null) {
-                    _programa.value = programaActualCompleto // Programa encontrado y asignado.
-                } else {
-                    // Si no se encuentra el programa (raro si el ID es válido),
-                    // uso un objeto Programa de fallback con el nombre pasado y una descripción genérica.
-                    // Considero si esto debería ser un error más fuerte.
-                    _programa.value = Programa(id = programaId, name = programaNombre, slug = "", description = "Descripción no disponible")
-                    // _error.value = "No se pudo encontrar la información completa del programa." // Opcional
-                }
-                _isLoadingPrograma.value = false // Termina la carga de detalles del programa.
+                    _programa.value = programaActualCompleto
+                    val episodeCount = programaActualCompleto.count ?: 30 // Usar count o un default
 
-                // Ahora cargo los episodios para este programa.
-                val fetchedEpisodios = episodioRepository.getEpisodiosPorPrograma(programaId = programaId, perPage = 30)
-                _episodios.value = fetchedEpisodios
+                    // WordPress tiene un límite máximo para per_page (usualmente 100).
+                    // Si episodeCount es mayor, necesitaríamos paginar.
+                    // Por simplicidad aquí, si count es > 100, pedimos 100.
+                    // Una solución completa requeriría múltiples llamadas si count > 100.
+                    val perPageEffective = if (episodeCount > 0 && episodeCount <= 100) episodeCount else 30
+                    // Si count es 0, podríamos pedir 1 para obtener una respuesta vacía
+                    // o directamente no hacer la llamada si sabemos que no hay episodios.
+                    // Si es > 100, usar 30 (o 100 y luego implementar paginación completa)
+
+                    if (episodeCount == 0) {
+                        _episodios.value = emptyList()
+                    } else {
+                        val fetchedEpisodios = episodioRepository.getEpisodiosPorPrograma(
+                            programaId = programaId,
+                            page = 1, // Asumimos que queremos la primera página (todos si perPageEffective cubre el count)
+                            perPage = perPageEffective
+                        )
+                        _episodios.value = fetchedEpisodios
+                    }
+
+                } else {
+                    _programa.value = Programa(id = programaId, name = programaNombre, slug = "", description = "Descripción no disponible")
+                    // Si no podemos obtener el programa, ¿qué hacemos con los episodios?
+                    // Podríamos intentar cargarlos con un perPage por defecto o mostrar error.
+                    _error.value = "No se pudo encontrar la información completa del programa."
+                    _episodios.value = emptyList()
+                }
 
             } catch (e: NoInternetException) {
                 _error.value = e.message ?: "Sin conexión a internet."
-                _episodios.value = emptyList() // Limpio episodios en caso de error.
+                _episodios.value = emptyList()
             } catch (e: ServerErrorException) {
                 _error.value = e.userFriendlyMessage
                 _episodios.value = emptyList()
             } catch (e: Exception) {
-                _error.value = "No se pudo cargar la información del programa o episodios."
+                _error.value = "No se pudo cargar la información del programa o episodios: ${e.localizedMessage}"
                 _episodios.value = emptyList()
             } finally {
-                // Aseguro que los indicadores de carga se desactiven.
-                _isLoadingPrograma.value = false
+                _isLoadingPrograma.value = false // Asegurarse de que ambos se ponen a false
                 _isLoadingEpisodios.value = false
             }
         }
