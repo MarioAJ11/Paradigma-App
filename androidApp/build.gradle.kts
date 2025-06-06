@@ -76,33 +76,26 @@ dependencies {
 
     // Navegación con Jetpack Compose
     implementation(libs.androidx.navigation.compose)
-    // implementation(libs.androidx.navigation.runtime.ktx) // Esta dependencia ya no es necesaria explícitamente con las versiones recientes de navigation-compose
 
     // Media3 ExoPlayer (Reproducción de audio/video)
     implementation(libs.androidx.media3.common)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session) // Integración con MediaSession
-    // implementation(libs.androidx.media3.ui) // Componentes UI opcionales para Media3 (Añadir si se usan controles UI de Media3)
+
+    implementation("androidx.paging:paging-compose:3.3.0")
 
     // Ktor (Networking)
-    // Si Ktor se usa solo en :shared, esta dependencia podría no ser necesaria aquí directamente.
-    // Sin embargo, si :androidApp hace llamadas de red directas o usa el motor de Android de Ktor:
-    implementation(libs.ktor.client.android) // Motor Ktor para Android (ej. OkHttp o CIO)
+    implementation(libs.ktor.client.android)
 
     // Kotlinx Coroutines
-    implementation(libs.kotlinx.coroutines.android) // Soporte para Android (Dispatchers.Main)
+    implementation(libs.kotlinx.coroutines.android)
 
     // Kotlinx Serialization (JSON)
-    // Necesario si este módulo serializa/deserializa JSON directamente.
-    // Si toda la serialización ocurre en :shared, puede ser transitiva.
-    implementation(libs.kotlinx.serialization.json) //
+    implementation(libs.kotlinx.serialization.json)
 
     // Coil (Carga de imágenes en Compose)
     implementation(libs.coil.compose)
 
-    // Timber (Logging) - Se eliminarán las llamadas en el código fuente, pero la dependencia puede permanecer
-    // si se planea reintroducir para builds de depuración controlados.
-    // Para una build de producción limpia, se podría comentar o usar variantes de compilación.
-    // Por ahora, la mantendré si está en tu libs, asumiendo que las llamadas se eliminan.
+    // Timber (Logging)
     implementation(libs.timber)
 }

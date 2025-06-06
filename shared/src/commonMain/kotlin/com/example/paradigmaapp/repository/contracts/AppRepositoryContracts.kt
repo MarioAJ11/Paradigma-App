@@ -29,6 +29,14 @@ interface ProgramaRepository {
      * @throws ApiException Para otros errores específicos de la API no cubiertos por las anteriores.
      */
     suspend fun getProgramas(): List<Programa>
+
+    /**
+     * Recupera un único programa específico por su ID.
+     *
+     * @param programaId El ID del [Programa] a recuperar.
+     * @return El objeto [Programa] correspondiente o null si no se encuentra.
+     */
+    suspend fun getPrograma(programaId: Int): Programa?
 }
 
 /**

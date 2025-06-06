@@ -14,7 +14,7 @@ import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.http.HttpStatusCode
-import io.ktor.utils.io.errors.IOException // Import específico para errores de IO generales
+import io.ktor.utils.io.errors.IOException
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -169,7 +169,7 @@ class WordpressService : ProgramaRepository, EpisodioRepository {
      */
     override suspend fun buscarEpisodios(searchTerm: String): List<Episodio> {
         // Validación básica del término de búsqueda para evitar llamadas innecesarias a la API.
-        if (searchTerm.isBlank() || searchTerm.length <= 2) { //
+        if (searchTerm.isBlank() || searchTerm.length <= 2) {
             return emptyList()
         }
 
@@ -177,8 +177,27 @@ class WordpressService : ProgramaRepository, EpisodioRepository {
             ktorClient.get("$baseUrl/posts") {
                 parameter("search", searchTerm) // Parámetro 'search' de la API de WordPress.
                 parameter("per_page", 100) // Limita el número de resultados de búsqueda.
-                parameter("_embed", "wp:featuredmedia,wp:term")
             }.body()
+        }
+    }
+
+    /**
+     * Obtiene los detalles de un programa (término de la taxonomía 'radio') específico por su ID.
+     *
+     * @param programaId El ID del programa a recuperar.
+     * @return El objeto [Programa] si se encuentra; null si la API devuelve un 404.
+     */
+    override suspend fun getPrograma(programaId: Int): Programa? {
+        return try {
+            safeApiCall("Error al obtener el programa $programaId") {
+                ktorClient.get("$baseUrl/radio/$programaId").body() // Endpoint para un término de taxonomía por ID
+            }
+        } catch (e: ApiException) {
+            if (e.message?.startsWith("Recurso no encontrado") == true) {
+                null // Si es 404, el programa no existe, devolvemos null
+            } else {
+                throw e // Relanzamos otras excepciones de API
+            }
         }
     }
 }

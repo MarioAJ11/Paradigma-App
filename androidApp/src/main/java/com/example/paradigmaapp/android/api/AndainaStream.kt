@@ -17,6 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 
 /**
  * Gestiona la reproducción del stream de audio de Andaina FM y la obtención de metadatos relacionados.
@@ -112,23 +113,33 @@ class AndainaStream(private val context: Context) {
      * Obtiene la información actual de la radio (ej. canción actual, oyentes) desde la API de Andaina.
      * Esta función es suspendida y debe ser llamada desde una corutina.
      *
+     * Maneja respuestas JSON no estándar (envueltas en paréntesis) limpiando la cadena antes de deserializar.
+     *
      * @return Un objeto [RadioInfo] si la llamada a la API y la deserialización son exitosas;
      * `null` si ocurre algún error (red, HTTP, deserialización).
      */
     suspend fun getRadioInfo(): RadioInfo? = withContext(Dispatchers.IO) {
         try {
-            val response = ktorClient.get {
+            val rawResponse: String = ktorClient.get {
                 url {
                     takeFrom(apiUrl)
-                    path("cp/get_info.php") //
-                    parameters.append("p", "8042") //
+                    path("cp/get_info.php")
+                    parameters.append("p", "8042")
                 }
+            }.body()
+
+            if (rawResponse.startsWith("") && rawResponse.endsWith("")) {
+                val cleanedJson = rawResponse.substring(1, rawResponse.length - 1)
+
+                // Deserializar la cadena JSON limpia manualmente
+                Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                }.decodeFromString<RadioInfo>(cleanedJson)
+            } else {
+                null // La respuesta no tiene el formato esperado
             }
-            response.body<RadioInfo>()
         } catch (e: Exception) {
-            // En producción, este error debería ser registrado en un sistema de monitoreo.
-            // Ejemplo: Crashlytics.log("Error fetching Andaina radio info: ${e.message}")
-            // Crashlytics.recordException(e)
             null // Devuelve null en caso de cualquier error.
         }
     }
