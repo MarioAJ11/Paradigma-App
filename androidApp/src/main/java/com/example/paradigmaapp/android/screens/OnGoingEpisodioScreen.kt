@@ -38,8 +38,7 @@ import com.example.paradigmaapp.model.Episodio
 import kotlinx.coroutines.launch
 
 /**
- * Pantalla que muestra la lista de episodios cuya reproducción está "en curso"
- * (es decir, episodios que el usuario ha comenzado a escuchar pero no ha terminado).
+ * Pantalla que muestra la lista de episodios cuya reproducción está "en curso".
  * Permite al usuario continuar escuchando desde donde lo dejó.
  *
  * @param onGoingEpisodioViewModel ViewModel que gestiona la lógica y el estado de los episodios en curso.
@@ -63,7 +62,7 @@ fun OnGoingEpisodioScreen(
 ) {
     val onGoingEpisodios by onGoingEpisodioViewModel.onGoingEpisodios.collectAsState()
     val queueEpisodeIds by queueViewModel.queueEpisodeIds.collectAsState()
-    val downloadedEpisodeIds by downloadedViewModel.downloadedEpisodeIds.collectAsState()
+    val downloadedEpisodios by downloadedViewModel.downloadedEpisodios.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -72,26 +71,13 @@ fun OnGoingEpisodioScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "Seguir Escuchando",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
+                title = { Text("Seguir Escuchando", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { innerPadding ->
@@ -103,13 +89,11 @@ fun OnGoingEpisodioScreen(
         ) {
             if (onGoingEpisodios.isEmpty()) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No tienes episodios en progreso para continuar.",
+                        text = "No tienes episodios en progreso.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         textAlign = TextAlign.Center
@@ -129,14 +113,12 @@ fun OnGoingEpisodioScreen(
                             onRemoveFromQueue = { queueViewModel.removeEpisodeFromQueue(it) },
                             onDownloadEpisode = { ep, onMsgCallback ->
                                 downloadedViewModel.downloadEpisodio(ep) { message ->
-                                    onMsgCallback(message) // Propaga el mensaje si es necesario
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(message)
-                                    }
+                                    onMsgCallback(message)
+                                    coroutineScope.launch { snackbarHostState.showSnackbar(message) }
                                 }
                             },
                             onDeleteDownload = { downloadedViewModel.deleteDownloadedEpisodio(it) },
-                            isDownloaded = downloadedEpisodeIds.contains(episodio.id),
+                            isDownloaded = downloadedEpisodios.any { it.id == episodio.id },
                             isInQueue = queueEpisodeIds.contains(episodio.id),
                             modifier = Modifier.padding(vertical = 4.dp)
                         )

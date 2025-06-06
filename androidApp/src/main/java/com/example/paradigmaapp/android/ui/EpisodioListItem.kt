@@ -6,11 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -33,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.paradigmaapp.android.R
@@ -87,13 +86,9 @@ fun EpisodioListItem(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(), // El Row ocupa todo el ancho de la Card
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // La imagen ahora no tendrá padding extra con respecto al Row.
-            // El Row sí podría tener padding si se lo aplicas al Card o al Row directamente.
-            // Si el Card tiene padding interno, la imagen aún lo respetará.
-            // Para que la imagen toque los bordes del Card, el Row no debería tener padding horizontal.
             AsyncImage(
                 model = episodio.imageUrl,
                 contentDescription = "Portada de ${episodio.title}",
@@ -116,8 +111,8 @@ fun EpisodioListItem(
                     text = episodio.title,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    // maxLines = 2, // Eliminado para mostrar título completo
-                    // overflow = TextOverflow.Ellipsis // Eliminado
+                     maxLines = 2,
+                     overflow = TextOverflow.Ellipsis
                 )
                 if (episodio.duration.isNotBlank() && episodio.duration != "--:--") {
                     Text(

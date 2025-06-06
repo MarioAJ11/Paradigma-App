@@ -82,7 +82,7 @@ fun BottomNavigationBar(
         // Ítem de Descargas
         NavigationBarItem(
             icon = { Icon(Icons.Filled.Download, contentDescription = "Descargas") },
-            label = { Text("Descargas") },
+            label = { Text("Descarga") },
             selected = currentDestination?.hierarchy?.any { it.route == Screen.Downloads.route } == true,
             onClick = onDownloadedClick,
             colors = itemColors

@@ -27,8 +27,8 @@ import kotlinx.coroutines.launch
  * @author Mario Alguacil Juárez
  */
 class EpisodeDetailViewModel(
-    private val episodioRepository: EpisodioRepository, //
-    private val savedStateHandle: SavedStateHandle //
+    private val episodioRepository: EpisodioRepository,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     /**
@@ -36,26 +36,32 @@ class EpisodeDetailViewModel(
      * Se obtiene de los argumentos de navegación a través de [SavedStateHandle].
      * Si no se encuentra, se establece a -1, indicando un estado inválido.
      */
-    val episodeId: Int = savedStateHandle.get<Int>("episodeId") ?: -1 //
+    val episodeId: Int = savedStateHandle.get<Int>("episodeId") ?: -1
 
-    // StateFlow para el objeto Episodio actual, con todos sus detalles.
+    /**
+     * Contiene el estado del objeto [Episodio] actual, con todos sus detalles.
+     * Es `null` mientras se carga o si ocurre un error.
+     */
     private val _episodio = MutableStateFlow<Episodio?>(null)
     val episodio: StateFlow<Episodio?> = _episodio.asStateFlow()
 
-    // StateFlow para la lista de programas ([Programa]) asociados a este episodio.
-    // Se utiliza para mostrar información como los creadores o el programa al que pertenece.
+    /**
+     * Contiene el estado de la lista de [Programa]s asociados a este episodio.
+     * Se utiliza para mostrar información como los creadores o el programa al que pertenece.
+     */
     private val _programasAsociados = MutableStateFlow<List<Programa>>(emptyList())
     val programasAsociados: StateFlow<List<Programa>> = _programasAsociados.asStateFlow()
 
-    // StateFlow para indicar si los detalles del episodio se están cargando actualmente.
+    /** Indica si los detalles del episodio se están cargando actualmente. */
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    // StateFlow para almacenar cualquier mensaje de error que ocurra durante la carga de datos.
+    /** Almacena cualquier mensaje de error que ocurra durante la carga de datos. */
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
     init {
+        // Iniciar la carga de datos solo si se ha proporcionado un ID de episodio válido.
         if (episodeId != -1) {
             loadEpisodeDetails()
         } else {
@@ -78,28 +84,30 @@ class EpisodeDetailViewModel(
             _isLoading.value = true
             _error.value = null // Limpiar errores previos al iniciar la carga
             try {
-                val fetchedEpisodio = episodioRepository.getEpisodio(episodeId) //
+                val fetchedEpisodio = episodioRepository.getEpisodio(episodeId)
                 _episodio.value = fetchedEpisodio
 
                 if (fetchedEpisodio != null) {
                     // Extraer programas asociados de los datos embebidos (_embedded.wp:term)
+                    // que WordPress puede incluir para evitar llamadas de red adicionales.
                     fetchedEpisodio.embedded?.terms?.let { terminosAnidados ->
+                        // La API devuelve una lista de listas, una por cada taxonomía. Las aplanamos.
                         val programasEncontrados = terminosAnidados.flatten()
-                            .distinctBy { programa -> programa.id } //
+                            .distinctBy { programa -> programa.id }
 
                         // Filtrar para asegurar que solo se incluyen los programas cuyos IDs están
-                        // realmente listados en `fetchedEpisodio.programaIds`.
+                        // realmente listados en el campo `radio` del episodio.
                         // Esto proporciona una capa adicional de consistencia.
                         _programasAsociados.value = fetchedEpisodio.programaIds?.let { idsDelEpisodio ->
                             programasEncontrados.filter { programa -> idsDelEpisodio.contains(programa.id) }
                         } ?: programasEncontrados // Fallback a todos los encontrados si programaIds es null
                     } ?: run {
-                        _programasAsociados.value = emptyList() // No hay términos o 'embedded' es null
+                        // Si no hay datos de términos embebidos, la lista de programas asociados queda vacía.
+                        _programasAsociados.value = emptyList()
                     }
                 } else {
-                    // Si fetchedEpisodio es null y no hubo una excepción previa (ej. 404 manejado por repo),
-                    // se establece un error genérico de "no encontrado".
-                    if (_error.value == null) { // Solo si no hay un error más específico ya
+                    // Si el repositorio devuelve null (ej. por un error 404), establecer un error.
+                    if (_error.value == null) { // Solo si no se ha establecido un error más específico.
                         _error.value = "No se pudo encontrar el episodio."
                     }
                 }
@@ -112,7 +120,6 @@ class EpisodeDetailViewModel(
                 _error.value = e.message ?: "Error de API al cargar detalles del episodio."
             } catch (e: Exception) {
                 _error.value = "Ocurrió un error desconocido al cargar los detalles del episodio."
-                // Considerar registrar `e` en un sistema de monitoreo para producción.
             } finally {
                 _isLoading.value = false
             }

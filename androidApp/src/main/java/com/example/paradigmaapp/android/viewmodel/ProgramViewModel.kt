@@ -108,7 +108,7 @@ class ProgramaViewModel(
                             programaId = programaId,
                             page = 1, // Asumimos que queremos la primera página (todos si perPageEffective cubre el count)
                             perPage = perPageEffective
-                        ) //
+                        )
                         _episodios.value = fetchedEpisodios
                     }
                 } else {

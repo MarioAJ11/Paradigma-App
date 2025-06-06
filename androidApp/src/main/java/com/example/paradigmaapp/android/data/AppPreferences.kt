@@ -2,11 +2,14 @@ package com.example.paradigmaapp.android.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.paradigmaapp.model.Episodio
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.builtins.ListSerializer // Para listas
-import kotlinx.serialization.builtins.MapSerializer // Para mapas
-import kotlinx.serialization.builtins.serializer // Para tipos básicos como String, Long, Int
 
 /**
  * Gestiona el almacenamiento y la recuperación de las preferencias de la aplicación
@@ -14,10 +17,6 @@ import kotlinx.serialization.builtins.serializer // Para tipos básicos como Str
  * objetos complejos (como listas y mapas) a formato JSON para su almacenamiento.
  *
  * @param context El [Context] de la aplicación, necesario para acceder a SharedPreferences.
- * @property jsonParser Instancia de [Json] para la serialización/deserialización, configurada
- * para ser leniente y omitir claves desconocidas.
- * @property prefs Instancia de [SharedPreferences] para el almacenamiento de datos.
- *
  * @author Mario Alguacil Juárez
  */
 class AppPreferences(context: Context) {
@@ -36,13 +35,13 @@ class AppPreferences(context: Context) {
         private const val PREF_IS_STREAM_ACTIVE = "isStreamActive_v2" //
         private const val PREF_EPISODE_POSITIONS = "episodePositions_v2" //
         private const val PREF_EPISODE_QUEUE_IDS = "episodeQueueIds_v2" //
-        private const val PREF_DOWNLOADED_EPISODE_IDS = "downloadedEpisodeIds_v2" //
+        private const val PREF_DOWNLOADED_EPISODIOS = "downloadedEpisodios_v1" // Clave para la lista de objetos Episodio descargados
+        private const val PREF_EPISODE_DETAILS_MAP = "episodeDetailsMap_v1" // Clave para guardar detalles de episodios individuales
         private const val PREF_MANUALLY_SET_DARK_THEME = "manuallySetDarkTheme_v1" // Clave para la preferencia de tema manual
     }
 
     /**
      * Guarda la posición de reproducción de un episodio.
-     * Las posiciones se almacenan en un mapa serializado a JSON.
      *
      * @param episodeId El ID del episodio.
      * @param positionMillis La posición de reproducción en milisegundos.
@@ -50,43 +49,50 @@ class AppPreferences(context: Context) {
     fun saveEpisodePosition(episodeId: Int, positionMillis: Long) {
         val positionsJson = prefs.getString(PREF_EPISODE_POSITIONS, "{}") ?: "{}"
         val positionsMap: MutableMap<String, Long> = try {
+            // Decodificar a un mapa mutable. Si el JSON está vacío, se creará uno nuevo.
             jsonParser.decodeFromString(
-                MapSerializer(String.serializer(), Long.serializer()), // Serializador explícito para el mapa
+                MapSerializer(String.serializer(), Long.serializer()),
                 positionsJson
-            )
-        } catch (e: Exception) {
-            // En caso de error al decodificar, se inicia con un mapa vacío.
-            // Considerar loggear este error en un sistema de monitoreo para producción si es frecuente.
-            mutableMapOf()
-        } as MutableMap<String, Long>
+            ).toMutableMap() // Crear una copia mutable segura
+        } catch (e: SerializationException) {
+            mutableMapOf() // En caso de error, empezar con un mapa nuevo.
+        }
         positionsMap[episodeId.toString()] = positionMillis
-        prefs.edit().putString(PREF_EPISODE_POSITIONS, jsonParser.encodeToString(positionsMap)).apply()
+        val newPositionsJson = jsonParser.encodeToString(positionsMap)
+        prefs.edit().putString(PREF_EPISODE_POSITIONS, newPositionsJson).apply()
     }
 
     /**
      * Obtiene la posición de reproducción guardada para un episodio.
      *
      * @param episodeId El ID del episodio.
-     * @return La posición de reproducción en milisegundos. Devuelve 0L si no hay posición guardada.
+     * @return La posición en milisegundos, o 0L si no se encuentra.
      */
     fun getEpisodePosition(episodeId: Int): Long {
-        val positionsJson = prefs.getString(PREF_EPISODE_POSITIONS, "{}") ?: "{}"
-        val positionsMap: Map<String, Long> = try {
-            jsonParser.decodeFromString(
-                MapSerializer(String.serializer(), Long.serializer()),
-                positionsJson
-            )
-        } catch (e: Exception) {
-            // En caso de error, devuelve un mapa vacío.
-            emptyMap()
-        }
+        val positionsMap = getAllEpisodePositions()
         return positionsMap[episodeId.toString()] ?: 0L
     }
 
     /**
-     * Guarda el ID del episodio actualmente en reproducción o seleccionado.
+     * Obtiene el mapa completo de todas las posiciones de episodios guardadas.
      *
-     * @param episodeId El ID del episodio. Si es null, se elimina la preferencia.
+     * @return Un mapa de ID de episodio (String) a su posición (Long).
+     */
+    fun getAllEpisodePositions(): Map<String, Long> {
+        val positionsJson = prefs.getString(PREF_EPISODE_POSITIONS, "{}") ?: "{}"
+        return try {
+            jsonParser.decodeFromString(
+                MapSerializer(String.serializer(), Long.serializer()),
+                positionsJson
+            )
+        } catch (e: SerializationException) {
+            emptyMap() // Devolver mapa vacío si el JSON es inválido
+        }
+    }
+
+    /** Guarda el ID del episodio actualmente activo.
+     *
+     * @param episodeId El ID del episodio o `null` si no se encuentra.
      */
     fun saveCurrentEpisodeId(episodeId: Int?) {
         val editor = prefs.edit()
@@ -98,10 +104,9 @@ class AppPreferences(context: Context) {
         editor.apply()
     }
 
-    /**
-     * Carga el ID del episodio actualmente en reproducción o seleccionado.
+    /** Carga el ID del episodio actualmente activo.
      *
-     * @return El ID del episodio, o null si no hay ninguno guardado.
+     * @return El ID del episodio o `null` si no se encuentra.
      */
     fun loadCurrentEpisodeId(): Int? {
         return if (prefs.contains(PREF_CURRENT_EPISODE_ID)) {
@@ -111,48 +116,41 @@ class AppPreferences(context: Context) {
         }
     }
 
-    /**
-     * Guarda la preferencia del usuario sobre si el streaming de Andaina FM debe estar activo por defecto.
+    /** Guarda la preferencia de si el streaming debe estar activo al iniciar.
      *
-     * @param isActive `true` si el streaming debe estar activo, `false` en caso contrario.
+     * @param isActive `true` si el streaming debe estar activo al iniciar, `false` en caso contrario.
      */
     fun saveIsStreamActive(isActive: Boolean) {
         prefs.edit().putBoolean(PREF_IS_STREAM_ACTIVE, isActive).apply()
     }
 
-    /**
-     * Carga la preferencia del usuario sobre si el streaming de Andaina FM debe estar activo por defecto.
+    /** Carga la preferencia de si el streaming debe estar activo.
      *
-     * @return `true` si el streaming debe estar activo (o si no hay preferencia guardada, por defecto es true),
-     * `false` en caso contrario.
+     * @return `true` si el streaming debe estar activo al iniciar, `false` en caso contrario.
      */
     fun loadIsStreamActive(): Boolean {
         return prefs.getBoolean(PREF_IS_STREAM_ACTIVE, true) //
     }
 
-    /**
-     * Guarda la cola de reproducción (lista de IDs de episodios).
-     * La lista se serializa a JSON.
+    /** Guarda la cola de reproducción (lista de IDs).
      *
-     * @param queueEpisodeIds La lista de IDs de episodios en la cola.
+     * @param queueEpisodeIds Una lista de enteros que representan los IDs de los episodios en la cola.
      */
     fun saveEpisodeQueue(queueEpisodeIds: List<Int>) {
         val jsonString = jsonParser.encodeToString(ListSerializer(Int.serializer()), queueEpisodeIds)
         prefs.edit().putString(PREF_EPISODE_QUEUE_IDS, jsonString).apply()
     }
 
-    /**
-     * Carga la cola de reproducción (lista de IDs de episodios).
-     * Deserializa la lista desde JSON.
+    /** Carga la cola de reproducción (lista de IDs).
      *
-     * @return La lista de IDs de episodios en la cola. Devuelve una lista vacía si no hay cola guardada o hay error.
+     *  @return Una lista de enteros que representan los IDs de los episodios en la cola.
      */
     fun loadEpisodeQueue(): List<Int> {
         val jsonString = prefs.getString(PREF_EPISODE_QUEUE_IDS, null)
-        return if (jsonString != null) {
+        return if (!jsonString.isNullOrEmpty()) {
             try {
                 jsonParser.decodeFromString(ListSerializer(Int.serializer()), jsonString)
-            } catch (e: Exception) {
+            } catch (e: SerializationException) {
                 emptyList()
             }
         } else {
@@ -160,29 +158,28 @@ class AppPreferences(context: Context) {
         }
     }
 
-    /**
-     * Guarda la lista de IDs de episodios descargados.
-     * La lista se serializa a JSON.
+    /** Guarda la lista completa de objetos Episodio que han sido descargados.
      *
-     * @param downloadedEpisodeIds La lista de IDs de episodios descargados.
+     *  @param downloadedEpisodios La lista de objetos Episodio a guardar.
      */
-    fun saveDownloadedEpisodeIds(downloadedEpisodeIds: List<Int>) {
-        val jsonString = jsonParser.encodeToString(ListSerializer(Int.serializer()), downloadedEpisodeIds)
-        prefs.edit().putString(PREF_DOWNLOADED_EPISODE_IDS, jsonString).apply()
+    fun saveDownloadedEpisodios(downloadedEpisodios: List<Episodio>) {
+        // Para serializar una lista de objetos complejos, necesitamos el serializador del objeto.
+        val serializer: KSerializer<List<Episodio>> = ListSerializer(Episodio.serializer())
+        val jsonString = jsonParser.encodeToString(serializer, downloadedEpisodios)
+        prefs.edit().putString(PREF_DOWNLOADED_EPISODIOS, jsonString).apply()
     }
 
-    /**
-     * Carga la lista de IDs de episodios descargados.
-     * Deserializa la lista desde JSON.
+    /** Carga la lista de objetos Episodio que están descargados.
      *
-     * @return La lista de IDs de episodios descargados. Devuelve una lista vacía si no hay datos guardados o hay error.
+     * @return Una lista de objetos Episodio. Si no hay datos, devuelve una lista vacía.
      */
-    fun loadDownloadedEpisodeIds(): List<Int> {
-        val jsonString = prefs.getString(PREF_DOWNLOADED_EPISODE_IDS, null)
-        return if (jsonString != null) {
+    fun loadDownloadedEpisodios(): List<Episodio> {
+        val jsonString = prefs.getString(PREF_DOWNLOADED_EPISODIOS, null)
+        return if (!jsonString.isNullOrEmpty()) {
             try {
-                jsonParser.decodeFromString(ListSerializer(Int.serializer()), jsonString)
-            } catch (e: Exception) {
+                val serializer: KSerializer<List<Episodio>> = ListSerializer(Episodio.serializer())
+                jsonParser.decodeFromString(serializer, jsonString)
+            } catch (e: SerializationException) {
                 emptyList()
             }
         } else {
@@ -190,34 +187,72 @@ class AppPreferences(context: Context) {
         }
     }
 
-    /**
-     * Guarda la preferencia manual del usuario para el tema de la aplicación (claro/oscuro/sistema).
+    /** Guarda los detalles completos de un episodio en un mapa persistido.
      *
-     * @param isDark `true` si el usuario seleccionó tema oscuro, `false` para tema claro,
-     * `null` si el usuario quiere seguir la configuración del sistema.
+     * @param episodio El episodio a guardar.
+     */
+    fun saveEpisodioDetails(episodio: Episodio) {
+        val detailsJson = prefs.getString(PREF_EPISODE_DETAILS_MAP, "{}") ?: "{}"
+        val detailsMap: MutableMap<String, String> = try {
+            jsonParser.decodeFromString(
+                MapSerializer(String.serializer(), String.serializer()),
+                detailsJson
+            ).toMutableMap()
+        } catch (e: SerializationException) {
+            mutableMapOf()
+        }
+        detailsMap[episodio.id.toString()] = jsonParser.encodeToString(episodio)
+        val newDetailsJson = jsonParser.encodeToString(detailsMap)
+        prefs.edit().putString(PREF_EPISODE_DETAILS_MAP, newDetailsJson).apply()
+    }
+
+    /** Carga los detalles de un episodio específico desde el mapa persistido.
+     *
+     * @param episodioId El ID del episodio a cargar.
+     * @return Los detalles del episodio o `null` si no se encuentra.
+     */
+    fun loadEpisodioDetails(episodioId: Int): Episodio? {
+        val detailsJson = prefs.getString(PREF_EPISODE_DETAILS_MAP, "{}") ?: "{}"
+        val detailsMap: Map<String, String> = try {
+            jsonParser.decodeFromString(MapSerializer(String.serializer(), String.serializer()), detailsJson)
+        } catch (e: SerializationException) {
+            return null
+        }
+        val episodioJson = detailsMap[episodioId.toString()]
+        return if (episodioJson != null) {
+            try {
+                jsonParser.decodeFromString<Episodio>(episodioJson)
+            } catch (e: SerializationException) {
+                null
+            }
+        } else {
+            null
+        }
+    }
+
+    /** Guarda la preferencia manual del usuario para el tema.
+     *
+     *  @param isDark `true` si el tema está configurado como oscuro, `false` si está configurado como claro, o `null` si no se encuentra.
      */
     fun saveIsManuallySetDarkTheme(isDark: Boolean?) {
         val editor = prefs.edit()
         if (isDark == null) {
-            editor.remove(PREF_MANUALLY_SET_DARK_THEME) // null significa seguir al sistema
+            editor.remove(PREF_MANUALLY_SET_DARK_THEME)
         } else {
             editor.putBoolean(PREF_MANUALLY_SET_DARK_THEME, isDark)
         }
         editor.apply()
     }
 
-    /**
-     * Carga la preferencia manual del tema de la aplicación.
+    /** Carga la preferencia manual del tema.
      *
-     * @return `true` si el tema oscuro fue seleccionado manualmente, `false` si fue el claro,
-     * o `null` si el usuario no ha establecido una preferencia manual (debe seguir al sistema).
+     * @return `true` si el tema está configurado como oscuro, `false` si está configurado como claro, o `null` si no se encuentra.
      */
     fun loadIsManuallySetDarkTheme(): Boolean? {
         return if (prefs.contains(PREF_MANUALLY_SET_DARK_THEME)) {
-            // El valor por defecto aquí no importa mucho si la clave existe.
             prefs.getBoolean(PREF_MANUALLY_SET_DARK_THEME, false)
         } else {
-            null // null significa que el usuario no ha elegido, seguir al sistema.
+            null
         }
     }
 }
