@@ -113,10 +113,11 @@ class AndainaStream(private val context: Context) {
      * Obtiene la información actual de la radio (ej. canción actual, oyentes) desde la API de Andaina.
      * Esta función es suspendida y debe ser llamada desde una corutina.
      *
-     * Maneja respuestas JSON no estándar (envueltas en paréntesis) limpiando la cadena antes de deserializar.
+     * Maneja respuestas JSON no estándar (envueltas en paréntesis) y es tolerante a
+     * formatos de datos flexibles (ej. números como strings).
      *
      * @return Un objeto [RadioInfo] si la llamada a la API y la deserialización son exitosas;
-     * `null` si ocurre algún error (red, HTTP, deserialización).
+     * `null` si ocurre algún error.
      */
     suspend fun getRadioInfo(): RadioInfo? = withContext(Dispatchers.IO) {
         try {
@@ -128,38 +129,20 @@ class AndainaStream(private val context: Context) {
                 }
             }.body()
 
-            if (rawResponse.startsWith("") && rawResponse.endsWith("")) {
+            if (rawResponse.startsWith("(") && rawResponse.endsWith(")")) {
                 val cleanedJson = rawResponse.substring(1, rawResponse.length - 1)
-
-                // Deserializar la cadena JSON limpia manualmente
-                Json {
+                val jsonParser = Json {
                     ignoreUnknownKeys = true
                     isLenient = true
-                }.decodeFromString<RadioInfo>(cleanedJson)
+                    coerceInputValues = true
+                }
+
+                jsonParser.decodeFromString<RadioInfo>(cleanedJson)
             } else {
                 null // La respuesta no tiene el formato esperado
             }
         } catch (e: Exception) {
-            null // Devuelve null en caso de cualquier error.
-        }
-    }
-
-    /**
-     * Lanza una corutina para obtener la información de la radio en segundo plano.
-     * Esta función es principalmente para propósitos de ejemplo o para iniciar una
-     * actualización de datos sin esperar directamente el resultado.
-     * Para actualizar la UI, se requeriría un mecanismo de callback o LiveData/StateFlow.
-     */
-    fun fetchRadioInfoInBackground() {
-        scope.launch {
-            val info = getRadioInfo()
-            if (info != null) {
-                // Aquí podrías, por ejemplo, postear el resultado a un StateFlow si esta clase
-                // fuera observada por un ViewModel, o emitir un evento.
-                // Ejemplo: _radioInfoStateFlow.value = info
-            } else {
-                // Manejar el caso en que la info no se pudo obtener.
-            }
+            null
         }
     }
 

@@ -32,7 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -43,29 +43,27 @@ import coil.compose.AsyncImage
 import com.example.paradigmaapp.android.R
 import com.example.paradigmaapp.model.Episodio
 import com.example.paradigmaapp.model.RadioInfo
-import androidx.compose.ui.graphics.drawscope.Stroke;
 
 /**
- * Composable que representa la interfaz de usuario del reproductor de audio compacto.
+ * Composable que representa la interfaz de usuario del reproductor de audio compacto global de la aplicación.
  * Muestra información sobre el episodio actual o el streaming en vivo, y proporciona controles de reproducción.
  *
- * @param activePlayer El reproductor [Player] de Media3 activo.
- * @param currentEpisode El [Episodio] que se está reproduciendo, o `null` si es el stream.
- * @param andainaRadioInfo Objeto [RadioInfo] con los metadatos del stream en vivo.
- * @param isPlayingGeneral Booleano que indica si algo se está reproduciendo.
- * @param episodeProgress Progreso de la reproducción del episodio (0.0 a 1.0).
- * @param onProgressChange Lambda que se invoca al interactuar con la barra de progreso.
+ * @param activePlayer El reproductor [Player] de Media3 activo. Puede ser nulo.
+ * @param currentEpisode El [Episodio] que se está reproduciendo, o `null` si es el stream en vivo.
+ * @param andainaRadioInfo Objeto [RadioInfo] con los metadatos del stream en vivo. Puede ser nulo.
+ * @param isPlayingGeneral Booleano que indica si algo (episodio o stream) se está reproduciendo.
+ * @param episodeProgress Progreso de la reproducción del episodio (un valor flotante entre 0.0 y 1.0).
+ * @param onProgressChange Lambda que se invoca cuando el usuario interactúa con la barra de progreso.
  * @param isAndainaStreamActive Indica si el modo de streaming de Andaina está activo.
- * @param isAndainaPlaying Indica si el stream de Andaina se está reproduciendo.
- * @param onPlayPauseClick Lambda para reproducir/pausar el contenido actual.
- * @param onPlayStreamingClick Lambda para (des)activar el modo de streaming.
- * @param onEpisodeInfoClick Lambda que se invoca al hacer clic en la información del episodio.
- * @param onVolumeIconClick Lambda para mostrar el control de volumen.
- * @param modifier Modificador opcional para el [Card] principal.
+ * @param isAndainaPlaying Indica si el stream de Andaina se está reproduciendo actualmente.
+ * @param onPlayPauseClick Lambda para la acción de reproducir/pausar el contenido actual.
+ * @param onPlayStreamingClick Lambda para la acción de (des)activar el modo de streaming.
+ * @param onEpisodeInfoClick Lambda que se invoca al hacer clic en la información del episodio para ver sus detalles.
+ * @param onVolumeIconClick Lambda para la acción de mostrar el control de volumen.
+ * @param modifier Modificador opcional para aplicar al [Card] principal.
  *
  * @author Mario Alguacil Juárez
  */
-
 @Composable
 fun AudioPlayer(
     activePlayer: Player?,
@@ -82,35 +80,40 @@ fun AudioPlayer(
     onVolumeIconClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Estado para controlar la visibilidad del círculo de progreso mientras se arrastra.
     var showProgressCircle by remember { mutableStateOf(false) }
+    // Estado para la posición del círculo, que puede diferir del progreso real mientras se arrastra.
     var progressCirclePosition by remember { mutableFloatStateOf(episodeProgress) }
 
+    // Efecto que se ejecuta cada vez que cambia el progreso de reproducción.
+    // Actualiza la posición del círculo solo si el usuario no lo está arrastrando.
     LaunchedEffect(episodeProgress) {
         if (!showProgressCircle) {
             progressCirclePosition = episodeProgress
         }
     }
 
+    // Colores del tema para la UI del reproductor.
     val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
     val secondaryColor = MaterialTheme.colorScheme.secondary
 
-    // Determina si el contenido actual es el stream en vivo (no hay episodio seleccionado).
+    // Determina si el contenido actual es el stream en vivo (si no hay ningún episodio seleccionado).
     val isEffectivelyLiveStream = currentEpisode == null
 
-    // Determina el texto y la URL de la imagen a mostrar en función de si se reproduce
-    // un episodio o el stream en vivo.
+    // Lógica para determinar qué texto e imagen mostrar.
     val (displayText, displayImageUrl) = if (isEffectivelyLiveStream) {
-        val streamTitle = andainaRadioInfo?.title
         val streamImageUrl = andainaRadioInfo?.art
 
-        val streamDisplayText = when {
-            !streamTitle.isNullOrBlank() -> streamTitle // Muestra el título de la canción si está disponible
-            andainaRadioInfo != null -> "Radio en Directo" // Si hay conexión pero no título, muestra texto por defecto
-            else -> "Sin emisión en directo" // Si no hay conexión/datos, muestra este mensaje
+        // Lógica para mostrar si hay o no streaming en directo
+        val streamDisplayText = if (isAndainaPlaying || isAndainaStreamActive) {
+            "Radio en Directo"
+        } else {
+            "Sin emisión en directo"
         }
         streamDisplayText to streamImageUrl
+        streamDisplayText to streamImageUrl
     } else {
-        // Muestra la información del episodio
+        // Si es un episodio, simplemente mostramos su título e imagen.
         currentEpisode?.title to currentEpisode?.imageUrl
     }
 
@@ -130,7 +133,7 @@ fun AudioPlayer(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Sección de información (imagen y título)
+                // Sección de información (imagen y texto), es clickable si es un episodio.
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -140,7 +143,7 @@ fun AudioPlayer(
                         .clickable(enabled = currentEpisode != null) { currentEpisode?.let(onEpisodeInfoClick) }
                         .padding(vertical = 4.dp)
                 ) {
-                    // Muestra dinámicamente la carátula del stream o la del episodio.
+                    // Carga la imagen desde la URL de forma asíncrona.
                     AsyncImage(
                         model = displayImageUrl,
                         contentDescription = "Portada de la emisión actual",
@@ -149,8 +152,6 @@ fun AudioPlayer(
                         error = painterResource(R.mipmap.logo_square),
                         placeholder = painterResource(R.mipmap.logo_square)
                     )
-
-                    // Muestra el título del episodio o la información del stream.
                     Text(
                         text = displayText ?: "Cargando...",
                         style = MaterialTheme.typography.titleSmall,
@@ -159,8 +160,7 @@ fun AudioPlayer(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-
-                // Sección de Controles
+                // Sección de botones de control.
                 Row(horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onPlayPauseClick) { Icon(painterResource(if (isPlayingGeneral) R.mipmap.pause else R.mipmap.play), if (isPlayingGeneral) "Pausar" else "Reproducir", Modifier.size(36.dp), tint = onPrimaryColor) }
                     IconButton(onClick = onVolumeIconClick) { Icon(painterResource(R.mipmap.volume), "Control de Volumen", Modifier.size(30.dp), tint = onPrimaryColor) }
@@ -168,7 +168,7 @@ fun AudioPlayer(
                 }
             }
 
-            // Barra de progreso (solo visible e interactiva para episodios)
+            // Muestra la barra de progreso personalizada.
             AudioProgressBar(
                 isLiveStream = isEffectivelyLiveStream,
                 progress = episodeProgress,
@@ -177,73 +177,6 @@ fun AudioPlayer(
                 onProgressChange = onProgressChange,
                 onDragStateChange = { isDragging -> showProgressCircle = isDragging }
             )
-        }
-    }
-}
-
-/** Composable auxiliar que encapsula la lógica de la barra de progreso.
- *
- * @param isLiveStream Indica si el contenido es un stream en vivo.
- * @param progress Progreso de la reproducción (0.0 a 1.0).
- * @param circlePosition Posición del círculo de progreso (0.0 a 1.0).
- * @param showCircle Indica si se debe mostrar el círculo de progreso.
- * @param onProgressChange Lambda que se invoca al interactuar con la barra de progreso.
- * @param onDragStateChange Lambda que se invoca cuando el estado de arrastre cambia.
- * @param modifier Modificador opcional para el [Box] principal.
- *
- * @author Mario Alguacil Juárez
- */
-@Composable
-private fun AudioProgressBar(
-    isLiveStream: Boolean,
-    progress: Float,
-    circlePosition: Float,
-    showCircle: Boolean,
-    onProgressChange: (Float) -> Unit,
-    onDragStateChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    if (isLiveStream) {
-        // Si es un stream en vivo, no se muestra barra de progreso interactiva.
-        Spacer(modifier = modifier.fillMaxWidth().height(8.dp))
-        return
-    }
-
-    val secondaryColor = MaterialTheme.colorScheme.secondary
-    val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
-    val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(8.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(surfaceVariantColor.copy(alpha = 0.3f))
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragStart = { offset ->
-                        onDragStateChange(true)
-                        val newProgress = (offset.x / size.width).coerceIn(0f, 1f)
-                        onProgressChange(newProgress)
-                    },
-                    onHorizontalDrag = { change, _ ->
-                        change.consume()
-                        val newProgress = (change.position.x / size.width).coerceIn(0f, 1f)
-                        onProgressChange(newProgress)
-                    },
-                    onDragEnd = { onDragStateChange(false) },
-                    onDragCancel = { onDragStateChange(false) }
-                )
-            }
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val progressWidth = size.width * progress
-            drawLine(secondaryColor, start = Offset.Zero.copy(y = center.y), end = Offset(progressWidth, center.y), strokeWidth = size.height)
-            if (showCircle) {
-                val circleX = (size.width * circlePosition).coerceIn(0f, size.width)
-                drawCircle(secondaryColor.copy(alpha = 0.7f), radius = 10.dp.toPx(), center = Offset(circleX, center.y))
-                drawCircle(onPrimaryColor, radius = 10.dp.toPx(), center = Offset(circleX, center.y), style = Stroke(width = 1.dp.toPx()))
-            }
         }
     }
 }

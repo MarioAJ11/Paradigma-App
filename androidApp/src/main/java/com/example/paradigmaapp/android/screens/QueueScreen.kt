@@ -69,7 +69,7 @@ fun QueueScreen(
                             episodio = episodio,
                             onPlayEpisode = { onEpisodeSelected(it) },
                             onEpisodeLongClick = { onEpisodeLongClicked(it) },
-                            onAddToQueue = { /* No-op */ },
+                            onAddToQueue = { /* No se añaden episodios a la cola desde la propia cola */ },
                             onRemoveFromQueue = { queueViewModel.removeEpisodeFromQueue(it) },
                             onDownloadEpisode = { ep, onMsgCallback ->
                                 downloadedViewModel.downloadEpisodio(ep) { message ->

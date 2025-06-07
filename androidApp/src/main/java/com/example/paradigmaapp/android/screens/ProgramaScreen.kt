@@ -82,7 +82,6 @@ fun ProgramaScreen(
     onEpisodeLongClicked: (Episodio) -> Unit,
     onBackClick: () -> Unit
 ) {
-    // --- OBSERVACIÓN DEL ESTADO ---
     // Observa los detalles del programa para la cabecera.
     val programa by programaViewModel.programa.collectAsState()
     // Conecta el Flow de PagingData a la UI de Compose.
@@ -108,7 +107,6 @@ fun ProgramaScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
-                // --- CABECERA ---
                 item {
                     Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
                     ProgramaInfoHeader(programa = programa)
@@ -123,7 +121,6 @@ fun ProgramaScreen(
                     }
                 }
 
-                // --- LISTA DE EPISODIOS PAGINADOS ---
                 items(
                     count = lazyPagingItems.itemCount,
                     // La key ayuda a Compose a optimizar la recomposición de la lista.
@@ -151,7 +148,6 @@ fun ProgramaScreen(
                     }
                 }
 
-                // --- ESTADO DE CARGA DE LA SIGUIENTE PÁGINA ---
                 item {
                     // 'append' se refiere al estado de carga al final de la lista.
                     when (val state = lazyPagingItems.loadState.append) {
@@ -168,9 +164,12 @@ fun ProgramaScreen(
                         else -> {} // No hacer nada si no está cargando ni en error.
                     }
                 }
+
+                item {
+                    Spacer(modifier = Modifier.height(160.dp))
+                }
             }
 
-            // --- ESTADO DE CARGA INICIAL DE LA PANTALLA ---
             // 'refresh' se refiere al estado de la carga inicial de toda la lista.
             when (val state = lazyPagingItems.loadState.refresh) {
                 is LoadState.Loading -> {

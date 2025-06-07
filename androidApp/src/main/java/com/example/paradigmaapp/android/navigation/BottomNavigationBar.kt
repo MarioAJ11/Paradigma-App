@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -60,7 +61,7 @@ fun BottomNavigationBar(
 
     NavigationBar(
         modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.surface, // Color de fondo de la barra de navegación
+        containerColor = Color.Transparent, // Color de fondo de la barra de navegación
         contentColor = MaterialTheme.colorScheme.onSurface // Color de contenido por defecto (raramente usado directamente aquí)
     ) {
         // Ítem de Búsqueda
@@ -69,7 +70,7 @@ fun BottomNavigationBar(
             label = { Text("Buscar") }, // Añadir etiqueta de texto
             selected = currentDestination?.hierarchy?.any { it.route == Screen.Search.route } == true,
             onClick = onSearchClick,
-            colors = itemColors // Aplicar colores personalizados
+            colors = itemColors
         )
         // Ítem de Continuar (OnGoing)
         NavigationBarItem(

@@ -158,7 +158,7 @@ fun EpisodeDetailScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = episodio.title.unescapeHtmlEntities(), // *** CORREGIDO ***
+                                text = episodio.title.unescapeHtmlEntities(),
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,
@@ -212,6 +212,7 @@ fun EpisodeDetailScreen(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                         }
+                        Spacer(modifier = Modifier.height(160.dp))
                     }
                 }
                 else -> {
@@ -224,7 +225,11 @@ fun EpisodeDetailScreen(
     }
 }
 
-/** Formatea una fecha ISO 8601 (GMT) a un formato legible en español. */
+/** Formatea una fecha ISO 8601 (GMT) a un formato legible en español.
+ *
+ * @param isoDate La fecha en formato ISO 8601 (GMT).
+ * @return Una cadena con la fecha formateada o "Fecha desconocida" en caso de error.
+ */
 private fun formatarFechaIso(isoDate: String?): String {
     if (isoDate == null) return "Fecha desconocida"
     return try {
@@ -237,7 +242,11 @@ private fun formatarFechaIso(isoDate: String?): String {
     } catch (e: Exception) { "Fecha no procesable" }
 }
 
-/** Un Composable auxiliar para mostrar un metadato con un icono y texto. */
+/** Un Composable auxiliar para mostrar un metadato con un icono y texto.
+ *
+ * @param icon El [ImageVector] que representa el icono del metadato.
+ * @param text El texto que describe el metadato.
+ */
 @Composable
 private fun MetaDataItem(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {

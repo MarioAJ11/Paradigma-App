@@ -28,8 +28,7 @@ import kotlin.coroutines.cancellation.CancellationException
 class WordpressService : ProgramaRepository, EpisodioRepository {
 
     // URL base para la API de WordPress.
-    // Ejemplo: "https://pruebas.paradigmamedia.org/wp-json/wp/v2"
-    private val baseUrl = "https://pruebas.paradigmamedia.org/wp-json/wp/v2" //
+    private val baseUrl = "https://pruebas.paradigmamedia.org/wp-json/wp/v2"
 
     /**
      * Envuelve las llamadas a la API con un manejo de errores común para excepciones de Ktor y de red.
