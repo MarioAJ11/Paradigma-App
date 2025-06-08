@@ -1,0 +1,22 @@
+-- Define la tabla para los programas
+CREATE TABLE ProgramaEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    description TEXT,
+    imageUrl TEXT,
+    count INTEGER
+);
+
+-- Inserta o actualiza un programa
+insertPrograma:
+INSERT OR REPLACE INTO ProgramaEntity(id, name, slug, description, imageUrl, count)
+VALUES (?, ?, ?, ?, ?, ?);
+
+-- Selecciona todos los programas
+selectAllProgramas:
+SELECT * FROM ProgramaEntity ORDER BY name ASC;
+
+-- Borra todos los programas
+deleteAllProgramas:
+DELETE FROM ProgramaEntity;

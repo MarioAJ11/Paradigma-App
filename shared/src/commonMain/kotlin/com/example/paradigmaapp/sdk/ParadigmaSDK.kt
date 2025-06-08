@@ -1,17 +1,16 @@
 package com.example.paradigmaapp.sdk
 
 import com.example.paradigmaapp.model.Programa
-import com.example.paradigmaapp.repository.WordpressService
+import com.example.paradigmaapp.repository.ParadigmaRepository
 
 /**
- * Clase "Facade" que actúa como el punto de entrada principal para las plataformas nativas iOS.
- * Encapsula la lógica del repositorio y expone funciones simples y claras para ser consumidas
- * desde Swift y otros lenguajes.
+ * Clase "Facade" que actúa como el punto de entrada principal para las plataformas nativas.
+ * No crea sus propias dependencias, sino que las recibe en su constructor.
  *
+ * @param repository El repositorio que contiene toda la lógica de datos.
  * @author Mario Alguacil Juárez
  */
-class ParadigmaSDK {
-    private val repository = WordpressService()
+class ParadigmaSDK(private val repository: ParadigmaRepository) {
 
     /**
      * Obtiene la lista de todos los programas.
@@ -24,6 +23,4 @@ class ParadigmaSDK {
     suspend fun getProgramas(): List<Programa> {
         return repository.getProgramas()
     }
-
-    // TODO: Con todo
 }

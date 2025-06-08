@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.paradigmaapp.android.data.AppPreferences
-import com.example.paradigmaapp.repository.WordpressService
+import com.example.paradigmaapp.repository.ParadigmaRepository
 
 /**
  * Factoría personalizada para la creación de instancias de [ViewModel].
@@ -14,7 +14,7 @@ import com.example.paradigmaapp.repository.WordpressService
  * a cada ViewModel en el momento de su creación.
  *
  * @property appPreferences Instancia de [AppPreferences] para la gestión de preferencias.
- * @property wordpressDataSource Instancia de [WordpressService], que implementa los repositorios.
+ * @property wordpressDataSource Instancia de [ParadigmaRepository], que implementa los repositorios.
  * @property applicationContext El [Context] de la aplicación.
  *
  * @author Mario Alguacil Juárez
@@ -22,7 +22,7 @@ import com.example.paradigmaapp.repository.WordpressService
 @Suppress("UNCHECKED_CAST")
 class ViewModelFactory(
     private val appPreferences: AppPreferences,
-    private val wordpressDataSource: WordpressService,
+    private val wordpressDataSource: ParadigmaRepository,
     private val applicationContext: Context
 ) : ViewModelProvider.Factory {
 

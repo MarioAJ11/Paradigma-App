@@ -16,6 +16,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.collections.remove
 
 /**
  * ViewModel responsable de gestionar la lógica y el estado de los episodios descargados.
@@ -35,17 +36,14 @@ class DownloadedEpisodioViewModel(
     // Este StateFlow contiene la lista de objetos Episodio completos, leída desde la persistencia local.
     private val _downloadedEpisodios = MutableStateFlow<List<Episodio>>(emptyList())
     val downloadedEpisodios: StateFlow<List<Episodio>> = _downloadedEpisodios.asStateFlow()
+    private val downloadsInProgress = mutableSetOf<Int>()
 
     private val MAX_DOWNLOADS = 10
 
     init {
-        loadDownloadedState() // Carga el estado de las descargas al inicializar el ViewModel.
+        loadDownloadedState()
     }
 
-    /**
-     * Carga la lista de objetos Episodio descargados directamente desde AppPreferences.
-     * Esta operación es segura para ejecutarse sin conexión a internet.
-     */
     private fun loadDownloadedState() {
         viewModelScope.launch(Dispatchers.IO) {
             val episodiosGuardados = appPreferences.loadDownloadedEpisodios()
@@ -56,19 +54,23 @@ class DownloadedEpisodioViewModel(
     }
 
     /**
-     * Inicia la descarga de un episodio. Si tiene éxito, actualiza la lista
-     * de episodios descargados y la guarda en AppPreferences.
+     * Inicia la descarga de un episodio, evitando duplicados y descargas concurrentes del mismo item.
      *
      * @param episodio El [Episodio] a descargar.
-     * @param onMessage Callback para notificar a la UI sobre el resultado de la descarga.
+     * @param onMessage Callback para notificar a la UI sobre el resultado.
      */
     fun downloadEpisodio(episodio: Episodio, onMessage: (String) -> Unit) {
         if (episodio.archiveUrl == null) {
             onMessage("El episodio '${episodio.title}' no tiene URL de descarga.")
             return
         }
-        if (_downloadedEpisodios.value.any { it.id == episodio.id }) {
+        if (isEpisodeDownloaded(episodio.id)) {
             onMessage("El episodio '${episodio.title}' ya está descargado.")
+            return
+        }
+        // Comprobamos si el episodio ya está en la cola de descargas en progreso.
+        if (downloadsInProgress.contains(episodio.id)) {
+            onMessage("La descarga de '${episodio.title}' ya está en curso.")
             return
         }
         if (_downloadedEpisodios.value.size >= MAX_DOWNLOADS) {
@@ -79,21 +81,34 @@ class DownloadedEpisodioViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val file = File(applicationContext.filesDir, createFileName(episodio))
             try {
-                // Lógica de descarga (URL, HttpURLConnection, FileOutputStream)
+                // Añadimos el ID al set de descargas en progreso.
+                downloadsInProgress.add(episodio.id)
+
                 val url = URL(episodio.archiveUrl)
                 val connection = url.openConnection() as HttpURLConnection
                 connection.connect()
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) throw IOException("Error del servidor: ${connection.responseCode}")
+
+                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                    throw IOException("Error del servidor: ${connection.responseCode}")
+                }
+
                 FileOutputStream(file).use { output -> connection.inputStream.use { it.copyTo(output) } }
 
-                // Éxito: Añadir a la lista y guardar en preferencias
                 val listaActualizada = _downloadedEpisodios.value + episodio
                 appPreferences.saveDownloadedEpisodios(listaActualizada)
+
                 withContext(Dispatchers.Main) {
                     _downloadedEpisodios.value = listaActualizada
+                    onMessage("Descarga de '${episodio.title}' completada.")
                 }
             } catch (e: Exception) {
                 file.delete()
+                withContext(Dispatchers.Main) {
+                    onMessage("Error al descargar '${episodio.title}'.")
+                }
+            } finally {
+                // Es crucial quitar el ID del set cuando la tarea termina (sea con éxito o error).
+                downloadsInProgress.remove(episodio.id)
             }
         }
     }

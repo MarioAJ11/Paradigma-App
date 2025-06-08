@@ -13,8 +13,7 @@ import com.example.paradigmaapp.android.viewmodel.ViewModelFactory
  * la estructura de navegación y la presentación de las diferentes pantallas.
  *
  * @param viewModelFactory La factoría [ViewModelFactory] necesaria para la creación de
- * ViewModels con dependencias dentro del [NavGraph] (ej. ViewModels con ámbito
- * a una ruta de navegación específica que requieran [androidx.lifecycle.SavedStateHandle]).
+ * ViewModels con dependencias dentro del [NavGraph].
  * @param mainViewModel Instancia del [MainViewModel] global, que gestiona el estado de
  * reproducción y datos principales.
  * @param searchViewModel Instancia del [SearchViewModel] para la funcionalidad de búsqueda.
@@ -27,10 +26,11 @@ fun ParadigmaApp(
     mainViewModel: MainViewModel,
     searchViewModel: SearchViewModel
 ) {
-    // Crea y recuerda el NavController para gestionar la navegación.
+    // Crea y recuerda el NavController que se usará para toda la navegación de la app.
     val navController = rememberNavController()
 
-    // Configura el grafo de navegación.
+    // Llama al NavGraph, pasándole todas las dependencias necesarias.
+    // NavGraph contendrá toda la lógica de qué pantalla mostrar en cada momento.
     NavGraph(
         navController = navController,
         viewModelFactory = viewModelFactory,

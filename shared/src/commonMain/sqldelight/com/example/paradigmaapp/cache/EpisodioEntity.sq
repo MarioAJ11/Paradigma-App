@@ -1,0 +1,25 @@
+-- Define la tabla para los episodios
+CREATE TABLE EpisodioEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT,
+    archiveUrl TEXT,
+    imageUrl TEXT,
+    date TEXT NOT NULL,
+    duration TEXT NOT NULL,
+    -- Columna para relacionar cada episodio con su programa
+    programaId INTEGER NOT NULL
+);
+
+-- Inserta o actualiza un episodio
+insertEpisodio:
+INSERT OR REPLACE INTO EpisodioEntity(id, title, content, archiveUrl, imageUrl, date, duration, programaId)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Selecciona todos los episodios de un programa específico
+selectEpisodiosByProgramaId:
+SELECT * FROM EpisodioEntity WHERE programaId = ? ORDER BY date DESC;
+
+-- Borra todos los episodios de un programa específico. Útil para refrescar la caché.
+deleteEpisodiosByProgramaId:
+DELETE FROM EpisodioEntity WHERE programaId = ?;
