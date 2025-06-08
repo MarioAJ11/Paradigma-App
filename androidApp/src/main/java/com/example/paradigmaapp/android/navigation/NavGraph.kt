@@ -185,34 +185,9 @@ fun NavGraph(
                 )
 
                 BottomNavigationBar(
-                    navController = navController,
-                    onSearchClick = { navigateToScreenIfDifferent(navController, Screen.Search.route) },
-                    onOnGoingClick = { navigateToScreenIfDifferent(navController, Screen.OnGoing.route) },
-                    onDownloadedClick = { navigateToScreenIfDifferent(navController, Screen.Downloads.route) },
-                    onQueueClick = { navigateToScreenIfDifferent(navController, Screen.Queue.route) },
-                    onSettingsClick = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } }
+                    navController = navController
                 )
             }
-        }
-    }
-}
-
-/** * Función de utilidad para la navegación de la barra inferior.
- * Comprueba si la ruta actual es diferente de la ruta de destino antes de navegar,
- * para evitar añadir la misma pantalla a la pila de navegación múltiples veces.
- * Gestiona la pila de retroceso para un comportamiento de navegación estándar en la barra inferior.
- *
- * @param navController El controlador de navegación.
- * @param route La ruta de destino.
- *
- * @author Mario Alguacil Juárez
- */
-private fun navigateToScreenIfDifferent(navController: NavHostController, route: String) {
-    if (navController.currentDestination?.route != route) {
-        navController.navigate(route) {
-            popUpTo(navController.graph.startDestinationId) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
         }
     }
 }

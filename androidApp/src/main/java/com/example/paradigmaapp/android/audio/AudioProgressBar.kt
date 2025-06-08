@@ -1,90 +1,78 @@
 package com.example.paradigmaapp.android.audio
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 
-
 /**
- * Composable auxiliar y privado que dibuja una barra de progreso personalizada y manejable.
- * No se muestra si el contenido es un stream en vivo.
+ * Dibuja una barra de progreso personalizada y manejable, con un círculo siempre visible.
  *
- * @param isLiveStream Si es `true`, la barra de progreso no se dibuja.
- * @param progress El progreso actual de la reproducción (0.0 a 1.0).
- * @param circlePosition La posición del círculo de arrastre.
- * @param showCircle `true` si el círculo de arrastre debe ser visible.
- * @param onProgressChange Callback que notifica un cambio en el progreso.
- * @param onDragStateChange Callback que notifica si el usuario está arrastrando la barra.
+ * @param isLiveStream Si es `true`, la barra no se dibuja.
+ * @param progress El progreso real de la reproducción (para la parte coloreada de la barra).
+ * @param dragPosition La posición del círculo de arrastre (0.0 a 1.0).
+ * @param onDragChange Callback que se invoca continuamente mientras el usuario arrastra.
+ * @param onDragEnd Callback que se invoca cuando el usuario suelta el círculo.
  */
 @Composable
 fun AudioProgressBar(
     isLiveStream: Boolean,
     progress: Float,
-    circlePosition: Float,
-    showCircle: Boolean,
-    onProgressChange: (Float) -> Unit,
-    onDragStateChange: (Boolean) -> Unit,
+    dragPosition: Float,
+    onDragChange: (Float) -> Unit,
+    onDragEnd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Si es un stream, no mostramos barra de progreso. Solo un espaciador para mantener el layout.
     if (isLiveStream) {
-        Spacer(modifier = modifier.fillMaxWidth().height(8.dp))
         return
     }
 
-    val secondaryColor = MaterialTheme.colorScheme.secondary
     val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
     val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(8.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(surfaceVariantColor.copy(alpha = 0.3f))
-            // El modificador pointerInput detecta gestos de arrastre horizontal.
+            .height(16.dp) // Altura suficiente para que el gesto de arrastre sea cómodo
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->
-                        onDragStateChange(true) // Notifica que el arrastre ha comenzado.
-                        val newProgress = (offset.x / size.width).coerceIn(0f, 1f)
-                        onProgressChange(newProgress)
+                        // Al empezar a arrastrar, actualizamos la posición
+                        val newPosition = (offset.x / size.width).coerceIn(0f, 1f)
+                        onDragChange(newPosition)
                     },
                     onHorizontalDrag = { change, _ ->
-                        change.consume() // Consume el evento para que no se propague.
-                        val newProgress = (change.position.x / size.width).coerceIn(0f, 1f)
-                        onProgressChange(newProgress)
+                        change.consume()
+                        val newPosition = (change.position.x / size.width).coerceIn(0f, 1f)
+                        onDragChange(newPosition)
                     },
-                    onDragEnd = { onDragStateChange(false) }, // Notifica que el arrastre ha terminado.
-                    onDragCancel = { onDragStateChange(false) }
+                    onDragEnd = { onDragEnd() },
+                    onDragCancel = { onDragEnd() }
                 )
             }
     ) {
-        // Usamos un Canvas para dibujar la barra de progreso de forma personalizada.
+        // Usamos un Canvas para dibujar la barra y el círculo de forma personalizada.
         Canvas(modifier = Modifier.fillMaxSize()) {
+            val barHeight = 4.dp.toPx()
+            // Dibuja la barra de fondo
+            drawLine(surfaceVariantColor.copy(alpha = 0.3f), start = Offset(0f, center.y), end = Offset(size.width, center.y), strokeWidth = barHeight)
+            // Dibuja la parte de la barra que ya se ha reproducido
             val progressWidth = size.width * progress
-            // Dibuja la línea de progreso.
-            drawLine(secondaryColor, start = Offset.Zero.copy(y = center.y), end = Offset(progressWidth, center.y), strokeWidth = size.height)
-            // Dibuja el círculo de arrastre si es visible.
-            if (showCircle) {
-                val circleX = (size.width * circlePosition).coerceIn(0f, size.width)
-                drawCircle(secondaryColor.copy(alpha = 0.7f), radius = 10.dp.toPx(), center = Offset(circleX, center.y))
-                drawCircle(onPrimaryColor, radius = 10.dp.toPx(), center = Offset(circleX, center.y), style = Stroke(width = 1.dp.toPx()))
-            }
+            drawLine(secondaryColor, start = Offset.Zero.copy(y = center.y), end = Offset(progressWidth, center.y), strokeWidth = barHeight)
+
+            // Dibuja el círculo en la posición de arrastre (o en la de reproducción si no se arrastra).
+            val circleX = (size.width * dragPosition).coerceIn(0f, size.width)
+            drawCircle(color = onPrimaryColor, radius = 6.dp.toPx(), center = Offset(circleX, center.y))
         }
     }
 }

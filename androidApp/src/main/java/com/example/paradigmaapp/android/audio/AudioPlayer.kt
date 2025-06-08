@@ -1,17 +1,11 @@
 package com.example.paradigmaapp.android.audio
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,9 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,7 +44,7 @@ import com.example.paradigmaapp.model.RadioInfo
  * @param andainaRadioInfo Objeto [RadioInfo] con los metadatos del stream en vivo. Puede ser nulo.
  * @param isPlayingGeneral Booleano que indica si algo (episodio o stream) se está reproduciendo.
  * @param episodeProgress Progreso de la reproducción del episodio (un valor flotante entre 0.0 y 1.0).
- * @param onProgressChange Lambda que se invoca cuando el usuario interactúa con la barra de progreso.
+ * @param onProgressChange Lambda que se invoca cuando el usuario termina de arrastrar la barra de progreso.
  * @param isAndainaStreamActive Indica si el modo de streaming de Andaina está activo.
  * @param isAndainaPlaying Indica si el stream de Andaina se está reproduciendo actualmente.
  * @param onPlayPauseClick Lambda para la acción de reproducir/pausar el contenido actual.
@@ -80,20 +71,19 @@ fun AudioPlayer(
     onVolumeIconClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Estado para controlar la visibilidad del círculo de progreso mientras se arrastra.
-    var showProgressCircle by remember { mutableStateOf(false) }
-    // Estado para la posición del círculo, que puede diferir del progreso real mientras se arrastra.
-    var progressCirclePosition by remember { mutableFloatStateOf(episodeProgress) }
+    // Estado para saber si el usuario está arrastrando el círculo.
+    var isDragging by remember { mutableStateOf(false) }
+    // Estado para la posición visual del círculo, que puede diferir del progreso real mientras se arrastra.
+    var dragPosition by remember { mutableFloatStateOf(episodeProgress) }
 
-    // Efecto que se ejecuta cada vez que cambia el progreso de reproducción.
-    // Actualiza la posición del círculo solo si el usuario no lo está arrastrando.
+    // Efecto que sincroniza la posición del círculo con el progreso real del audio
+    // solo cuando el usuario NO está arrastrando activamente.
     LaunchedEffect(episodeProgress) {
-        if (!showProgressCircle) {
-            progressCirclePosition = episodeProgress
+        if (!isDragging) {
+            dragPosition = episodeProgress
         }
     }
 
-    // Colores del tema para la UI del reproductor.
     val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
     val secondaryColor = MaterialTheme.colorScheme.secondary
 
@@ -103,17 +93,13 @@ fun AudioPlayer(
     // Lógica para determinar qué texto e imagen mostrar.
     val (displayText, displayImageUrl) = if (isEffectivelyLiveStream) {
         val streamImageUrl = andainaRadioInfo?.art
-
-        // Lógica para mostrar si hay o no streaming en directo
         val streamDisplayText = if (isAndainaPlaying || isAndainaStreamActive) {
             "Radio en Directo"
         } else {
             "Sin emisión en directo"
         }
         streamDisplayText to streamImageUrl
-        streamDisplayText to streamImageUrl
     } else {
-        // Si es un episodio, simplemente mostramos su título e imagen.
         currentEpisode?.title to currentEpisode?.imageUrl
     }
 
@@ -125,7 +111,10 @@ fun AudioPlayer(
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth(),
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .animateContentSize()
+                .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
@@ -143,7 +132,6 @@ fun AudioPlayer(
                         .clickable(enabled = currentEpisode != null) { currentEpisode?.let(onEpisodeInfoClick) }
                         .padding(vertical = 4.dp)
                 ) {
-                    // Carga la imagen desde la URL de forma asíncrona.
                     AsyncImage(
                         model = displayImageUrl,
                         contentDescription = "Portada de la emisión actual",
@@ -172,10 +160,15 @@ fun AudioPlayer(
             AudioProgressBar(
                 isLiveStream = isEffectivelyLiveStream,
                 progress = episodeProgress,
-                circlePosition = progressCirclePosition,
-                showCircle = showProgressCircle,
-                onProgressChange = onProgressChange,
-                onDragStateChange = { isDragging -> showProgressCircle = isDragging }
+                dragPosition = dragPosition,
+                onDragChange = { newPosition ->
+                    isDragging = true
+                    dragPosition = newPosition
+                },
+                onDragEnd = {
+                    isDragging = false
+                    onProgressChange(dragPosition)
+                }
             )
         }
     }
