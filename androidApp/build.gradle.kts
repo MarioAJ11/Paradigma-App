@@ -10,9 +10,9 @@ android {
     compileSdk = 35 // SDK de compilación
 
     defaultConfig {
-        applicationId = "com.example.paradigmaapp.android" // ID único de la app
+        applicationId = "org.paradigmamedia.paradigmaapp" // ID único de la app
         minSdk = 28 // Mínima versión de Android soportada
-        targetSdk = 35 // SDK objetivo (Alinear con compileSdk)
+        targetSdk = 35 // SDK objetivo
         versionCode = 1 // Código de versión para releases
         versionName = "1.0" // Nombre de versión visible
     }
@@ -33,18 +33,26 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getProperty("MYAPP_RELEASE_STORE_FILE", "none"))
+            storePassword = System.getProperty("MYAPP_RELEASE_STORE_PASSWORD", "none")
+            keyAlias = System.getProperty("MYAPP_RELEASE_KEY_ALIAS", "none")
+            keyPassword = System.getProperty("MYAPP_RELEASE_KEY_PASSWORD", "none")
+        }
+    }
+
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = true // Habilitar R8/ProGuard para ofuscar y reducir código
-            isShrinkResources = true // Habilitar reducción de recursos no utilizados
-            // Archivos de reglas de ProGuard.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"), // Reglas por defecto de Android
-                "proguard-rules.pro" // Reglas personalizadas del proyecto
-            ) //
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            // Le decimos que use la configuración de firma que acabamos de crear
+            signingConfig = signingConfigs.getByName("release")
         }
-        // Se podría definir un buildTypes "debug" aquí si se necesitaran configuraciones específicas
-        // diferentes a las predeterminadas
     }
 
     compileOptions {

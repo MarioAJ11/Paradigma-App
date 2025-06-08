@@ -76,7 +76,6 @@ class DownloadedEpisodioViewModel(
             return
         }
 
-        onMessage("Descargando '${episodio.title}'...")
         viewModelScope.launch(Dispatchers.IO) {
             val file = File(applicationContext.filesDir, createFileName(episodio))
             try {
@@ -92,13 +91,9 @@ class DownloadedEpisodioViewModel(
                 appPreferences.saveDownloadedEpisodios(listaActualizada)
                 withContext(Dispatchers.Main) {
                     _downloadedEpisodios.value = listaActualizada
-                    onMessage("Descarga de '${episodio.title}' completada.")
                 }
             } catch (e: Exception) {
-                file.delete() // Limpiar archivo parcial si falla
-                withContext(Dispatchers.Main) {
-                    onMessage("Error al descargar '${episodio.title}'.")
-                }
+                file.delete()
             }
         }
     }
