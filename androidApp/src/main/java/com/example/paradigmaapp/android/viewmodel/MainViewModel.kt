@@ -92,6 +92,9 @@ class MainViewModel(
     private val _currentVolume = MutableStateFlow(1f)
     val currentVolume: StateFlow<Float> = _currentVolume.asStateFlow()
 
+    private val _preparingEpisodeId = MutableStateFlow<Int?>(null)
+    val preparingEpisodeId: StateFlow<Int?> = _preparingEpisodeId.asStateFlow()
+
     private val _andainaRadioInfo = MutableStateFlow<RadioInfo?>(null)
     /** Contiene la información actual del stream de Andaina FM (título, artista, etc.). Es nulo si no hay información disponible. */
     val andainaRadioInfo: StateFlow<RadioInfo?> = _andainaRadioInfo.asStateFlow()
@@ -181,6 +184,9 @@ class MainViewModel(
             if (podcastExoPlayer.isPlaying) podcastExoPlayer.pause() else podcastExoPlayer.play()
             return
         }
+
+        _preparingEpisodeId.value = episodio.id
+
         _currentPlayingEpisode.value = episodio
         if (andainaStreamPlayer.isPlaying()) andainaStreamPlayer.stop()
         val savedPosition = appPreferences.getEpisodePosition(episodio.id)
@@ -286,9 +292,15 @@ class MainViewModel(
 
     /** Crea y devuelve el listener para el reproductor de podcasts (ExoPlayer). */
     private fun createPodcastPlayerListener(): Player.Listener = object : Player.Listener {
-        override fun onPlayerError(error: PlaybackException) { _initialDataError.value = "Error de reproducción: ${error.message}" }
+        override fun onPlayerError(error: PlaybackException) {
+            _initialDataError.value = "Error de reproducción: ${error.message}"
+            _preparingEpisodeId.value = null
+        }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) {
+                _preparingEpisodeId.value = null
+            }
             _isPodcastPlaying.value = isPlaying
             if (!isPlaying && podcastExoPlayer.playbackState != Player.STATE_ENDED && podcastExoPlayer.playbackState != Player.STATE_IDLE) {
                 _currentPlayingEpisode.value?.let { episodio ->

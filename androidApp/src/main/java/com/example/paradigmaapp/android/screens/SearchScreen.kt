@@ -19,41 +19,48 @@ import com.example.paradigmaapp.android.ui.ErrorType
 import com.example.paradigmaapp.android.ui.ErrorView
 import com.example.paradigmaapp.android.ui.SearchBar
 import com.example.paradigmaapp.android.viewmodel.DownloadedEpisodioViewModel
+import com.example.paradigmaapp.android.viewmodel.MainViewModel
 import com.example.paradigmaapp.android.viewmodel.QueueViewModel
 import com.example.paradigmaapp.android.viewmodel.SearchViewModel
 import com.example.paradigmaapp.model.Episodio
 import kotlinx.coroutines.launch
 
 /**
- * Pantalla que permite al usuario buscar episodios por un término de búsqueda.
+ * Pantalla que permite al usuario buscar episodios. Muestra resultados en tiempo real
+ * y proporciona feedback de carga y error.
  *
- * @param searchViewModel ViewModel que gestiona la lógica y el estado de la búsqueda.
- * @param queueViewModel ViewModel para interactuar con la cola de reproducción.
- * @param downloadedViewModel ViewModel para interactuar con el estado de las descargas.
- * @param onEpisodeSelected Lambda que se invoca cuando un episodio es seleccionado para reproducir.
- * @param onEpisodeLongClicked Lambda para acciones contextuales sobre un episodio (ej. ver detalles).
- * @param onBackClick Lambda para manejar la acción de retroceso y cerrar esta pantalla.
- *
+ * @param searchViewModel ViewModel que gestiona la lógica de búsqueda.
+ * @param mainViewModel ViewModel principal para gestionar la reproducción y el estado de carga.
+ * @param queueViewModel ViewModel para interactuar con la cola.
+ * @param downloadedViewModel ViewModel para interactuar con las descargas.
+ * @param onEpisodeSelected Lambda que se invoca al seleccionar un episodio para reproducir.
+ * @param onEpisodeLongClicked Lambda para acciones contextuales sobre un episodio.
+ * @param onBackClick Lambda para manejar la acción de retroceso.
  * @author Mario Alguacil Juárez
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     searchViewModel: SearchViewModel,
+    mainViewModel: MainViewModel, // <-- PARÁMETRO AÑADIDO
     queueViewModel: QueueViewModel,
     downloadedViewModel: DownloadedEpisodioViewModel,
     onEpisodeSelected: (Episodio) -> Unit,
     onEpisodeLongClicked: (Episodio) -> Unit,
     onBackClick: () -> Unit
 ) {
+    // Estados de la búsqueda
     val searchText by searchViewModel.searchText.collectAsState()
     val searchResults by searchViewModel.searchResults.collectAsState()
     val isSearching by searchViewModel.isSearching.collectAsState()
     val searchError by searchViewModel.searchError.collectAsState()
 
+    // Estados globales
     val downloadedEpisodios by downloadedViewModel.downloadedEpisodios.collectAsState()
     val queueEpisodeIds by queueViewModel.queueEpisodeIds.collectAsState()
+    val preparingEpisodeId by mainViewModel.preparingEpisodeId.collectAsState() // <-- AÑADIDO
 
+    // Controladores de UI y corutinas
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -82,21 +89,27 @@ fun SearchScreen(
             modifier = Modifier.fillMaxSize().padding(innerPadding).background(MaterialTheme.colorScheme.background)
         ) {
             when {
+                // Estado: buscando...
                 isSearching -> {
                     Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 }
+                // Estado: error
                 searchError != null && searchResults.isEmpty() -> {
                     val errorType = determineErrorType(searchError)
                     ErrorView(message = searchError!!, errorType = errorType, onRetry = if (errorType != ErrorType.NO_RESULTS) { { searchViewModel.retrySearch() } } else null)
                 }
+                // Estado: sin resultados
                 searchText.length >= 3 && searchResults.isEmpty() && !isSearching && searchError == null -> {
                     ErrorView(message = "No se encontraron episodios para \"$searchText\".", errorType = ErrorType.NO_RESULTS)
                 }
+                // Estado: resultados encontrados
                 searchResults.isNotEmpty() -> {
                     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp, horizontal = 8.dp)) {
                         items(searchResults, key = { it.id }) { episodio ->
+                            val isLoading = episodio.id == preparingEpisodeId
                             EpisodioListItem(
                                 episodio = episodio,
+                                isLoading = isLoading, // <-- Pasando el estado de carga
                                 onPlayEpisode = { onEpisodeSelected(it) },
                                 onEpisodeLongClick = { onEpisodeLongClicked(it) },
                                 onAddToQueue = { queueViewModel.addEpisodeToQueue(it) },
@@ -115,6 +128,7 @@ fun SearchScreen(
                         }
                     }
                 }
+                // Estado: esperando a que el usuario escriba más
                 searchText.length < 3 && !isSearching -> {
                     Box(Modifier.fillMaxSize().padding(16.dp), Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -124,6 +138,7 @@ fun SearchScreen(
                         }
                     }
                 }
+                // Estado inicial
                 else -> {
                     Box(Modifier.fillMaxSize().padding(16.dp), Alignment.Center) {
                         Icon(Icons.Filled.Search, "Pantalla de Búsqueda", Modifier.size(120.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
@@ -134,6 +149,11 @@ fun SearchScreen(
     }
 }
 
+/** Determina el tipo de error para mostrar el icono adecuado.
+ *
+ *  @param errorMessage El mensaje de error a analizar.
+ *  @return El tipo de error correspondiente.
+ */
 private fun determineErrorType(errorMessage: String?): ErrorType {
     return when {
         errorMessage == null -> ErrorType.GENERAL_SERVER_ERROR

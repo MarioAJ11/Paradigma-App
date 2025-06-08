@@ -15,33 +15,39 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.paradigmaapp.android.ui.EpisodioListItem
 import com.example.paradigmaapp.android.viewmodel.DownloadedEpisodioViewModel
+import com.example.paradigmaapp.android.viewmodel.MainViewModel
 import com.example.paradigmaapp.android.viewmodel.QueueViewModel
 import com.example.paradigmaapp.model.Episodio
 import kotlinx.coroutines.launch
 
 /**
- * Pantalla que muestra la cola de reproducción actual del usuario.
+ * Muestra la cola de reproducción actual del usuario, permitiéndole ver y gestionar
+ * los próximos episodios a escuchar.
  *
- * @param queueViewModel ViewModel para interactuar con la cola de reproducción.
- * @param downloadedViewModel ViewModel para interactuar con el estado de las descargas.
- * @param onEpisodeSelected Lambda que se invoca cuando un episodio es seleccionado para reproducir.
- * @param onEpisodeLongClicked Lambda para acciones contextuales sobre un episodio (ej. ver detalles).
- * @param onBackClick Lambda para manejar la acción de retroceso y cerrar esta pantalla.
- *
+ * @param queueViewModel ViewModel que gestiona la cola de reproducción.
+ * @param mainViewModel ViewModel principal para gestionar la reproducción y el estado de carga.
+ * @param downloadedViewModel ViewModel para interactuar con las descargas.
+ * @param onEpisodeSelected Lambda que se invoca al seleccionar un episodio.
+ * @param onEpisodeLongClicked Lambda para acciones contextuales sobre un episodio.
+ * @param onBackClick Lambda para manejar la acción de retroceso.
  * @author Mario Alguacil Juárez
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QueueScreen(
     queueViewModel: QueueViewModel,
+    mainViewModel: MainViewModel, // <-- PARÁMETRO AÑADIDO
     downloadedViewModel: DownloadedEpisodioViewModel,
     onEpisodeSelected: (Episodio) -> Unit,
     onEpisodeLongClicked: (Episodio) -> Unit,
     onBackClick: () -> Unit
 ) {
+    // Estados de la pantalla
     val queueEpisodios by queueViewModel.queueEpisodios.collectAsState()
     val downloadedEpisodios by downloadedViewModel.downloadedEpisodios.collectAsState()
+    val preparingEpisodeId by mainViewModel.preparingEpisodeId.collectAsState() // <-- AÑADIDO
 
+    // Controladores de UI y corutinas
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -59,17 +65,21 @@ fun QueueScreen(
             modifier = Modifier.fillMaxSize().padding(innerPadding).background(MaterialTheme.colorScheme.background)
         ) {
             if (queueEpisodios.isEmpty()) {
+                // Mensaje si la cola está vacía.
                 Box(Modifier.fillMaxSize().padding(16.dp), Alignment.Center) {
                     Text("Tu cola de reproducción está vacía.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), textAlign = TextAlign.Center)
                 }
             } else {
+                // Lista de episodios en la cola.
                 LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp, horizontal = 8.dp)) {
                     items(queueEpisodios, key = { it.id }) { episodio ->
+                        val isLoading = episodio.id == preparingEpisodeId
                         EpisodioListItem(
                             episodio = episodio,
+                            isLoading = isLoading,
                             onPlayEpisode = { onEpisodeSelected(it) },
                             onEpisodeLongClick = { onEpisodeLongClicked(it) },
-                            onAddToQueue = { /* No se añaden episodios a la cola desde la propia cola */ },
+                            onAddToQueue = { /* No se puede añadir desde la propia cola */ },
                             onRemoveFromQueue = { queueViewModel.removeEpisodeFromQueue(it) },
                             onDownloadEpisode = { ep, onMsgCallback ->
                                 downloadedViewModel.downloadEpisodio(ep) { message ->
@@ -79,7 +89,7 @@ fun QueueScreen(
                             },
                             onDeleteDownload = { downloadedViewModel.deleteDownloadedEpisodio(it) },
                             isDownloaded = downloadedEpisodios.any { it.id == episodio.id },
-                            isInQueue = true,
+                            isInQueue = true, // Todos en esta lista están en la cola
                             modifier = Modifier.padding(vertical = 4.dp)
                         )
                     }

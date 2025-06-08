@@ -6,19 +6,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,29 +38,28 @@ import com.example.paradigmaapp.android.R
 import com.example.paradigmaapp.model.Episodio
 
 /**
- * Un Composable que muestra un ítem individual de [Episodio] en una lista.
- * Proporciona información básica del episodio como imagen y título.
- * Incluye interactividad para reproducir el episodio, una acción de pulsación larga,
- * y un menú contextual con opciones adicionales.
- * La imagen se muestra sin padding y el título se muestra completo.
+ * Muestra un ítem de episodio individual en una lista.
+ * Proporciona feedback visual con un indicador de carga cuando el episodio se está preparando
+ * para la reproducción. También incluye un menú contextual para acciones adicionales.
  *
- * @param episodio El objeto [Episodio] a mostrar.
- * @param onPlayEpisode Lambda que se invoca cuando el usuario hace clic en el ítem para reproducir el episodio.
- * @param onEpisodeLongClick Lambda que se invoca cuando el usuario realiza una pulsación larga sobre el ítem.
- * @param onAddToQueue Lambda para añadir el episodio a la cola de reproducción.
- * @param onRemoveFromQueue Lambda para eliminar el episodio de la cola de reproducción.
+ * @param episodio El objeto [Episodio] cuyos datos se van a mostrar.
+ * @param isLoading Booleano que indica si se debe mostrar el indicador de carga.
+ * @param onPlayEpisode Lambda que se invoca al hacer clic para reproducir el episodio.
+ * @param onEpisodeLongClick Lambda que se invoca con una pulsación larga sobre el ítem.
+ * @param onAddToQueue Lambda para añadir el episodio a la cola.
+ * @param onRemoveFromQueue Lambda para quitar el episodio de la cola.
  * @param onDownloadEpisode Lambda para iniciar la descarga del episodio.
- * @param onDeleteDownload Lambda para eliminar un episodio descargado.
- * @param isDownloaded Booleano que indica si el episodio está actualmente descargado.
- * @param isInQueue Booleano que indica si el episodio está actualmente en la cola de reproducción.
- * @param modifier Modificador opcional para aplicar al [Card] principal.
- *
+ * @param onDeleteDownload Lambda para eliminar una descarga existente.
+ * @param isDownloaded Booleano que indica si el episodio ya está descargado.
+ * @param isInQueue Booleano que indica si el episodio ya está en la cola.
+ * @param modifier Modificador de Compose para personalizar el estilo del componente.
  * @author Mario Alguacil Juárez
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EpisodioListItem(
     episodio: Episodio,
+    isLoading: Boolean,
     onPlayEpisode: (Episodio) -> Unit,
     onEpisodeLongClick: (Episodio) -> Unit,
     onAddToQueue: (Episodio) -> Unit,
@@ -73,6 +70,7 @@ fun EpisodioListItem(
     isInQueue: Boolean,
     modifier: Modifier = Modifier
 ) {
+    // Estado para controlar la visibilidad del menú de opciones.
     var showContextMenu by remember { mutableStateOf(false) }
 
     Card(
@@ -91,30 +89,45 @@ fun EpisodioListItem(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = episodio.imageUrl,
-                contentDescription = "Portada de ${episodio.title}",
-                modifier = Modifier
-                    .size(72.dp) // Aumentamos un poco el tamaño de la imagen para compensar la falta de padding visual
-                    .clip(RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)), // Redondea esquinas izquierdas para que coincida con la Card
-                contentScale = ContentScale.Crop,
-                error = painterResource(R.mipmap.logo_foreground),
-                placeholder = painterResource(R.mipmap.logo_foreground)
-            )
+            // Contenedor para la imagen o el indicador de carga.
+            Box(
+                modifier = Modifier.size(72.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isLoading) {
+                    // Muestra un spinner si el episodio se está cargando.
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    // Muestra la imagen del episodio si no está cargando.
+                    AsyncImage(
+                        model = episodio.imageUrl,
+                        contentDescription = "Portada de ${episodio.title}",
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)),
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(R.mipmap.logo_foreground),
+                        placeholder = painterResource(R.mipmap.logo_foreground)
+                    )
+                }
+            }
 
-            // El Spacer y la Column ahora tendrán un padding inicial para separarlos de la imagen
+            // Columna con el título y la duración del episodio.
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 16.dp, vertical = 10.dp), // Padding para el contenido de texto
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = episodio.title,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                     maxLines = 2,
-                     overflow = TextOverflow.Ellipsis
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (episodio.duration.isNotBlank() && episodio.duration != "--:--") {
                     Text(
@@ -126,11 +139,11 @@ fun EpisodioListItem(
                 }
             }
 
-            // IconButton para mostrar el menú de opciones rápidas
+            // Botón y menú de opciones (descargar, añadir a cola, etc.).
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterVertically)
-                    .padding(end = 4.dp) // Padding ligero para el botón de menú
+                    .padding(end = 4.dp)
             ) {
                 IconButton(onClick = { showContextMenu = true }) {
                     Icon(
@@ -144,39 +157,15 @@ fun EpisodioListItem(
                     onDismissRequest = { showContextMenu = false }
                 ) {
                     if (isDownloaded) {
-                        DropdownMenuItem(
-                            text = { Text("Eliminar descarga") },
-                            onClick = {
-                                onDeleteDownload(episodio)
-                                showContextMenu = false
-                            }
-                        )
+                        DropdownMenuItem(text = { Text("Eliminar descarga") }, onClick = { onDeleteDownload(episodio); showContextMenu = false })
                     } else {
-                        DropdownMenuItem(
-                            text = { Text("Descargar") },
-                            onClick = {
-                                onDownloadEpisode(episodio) { /* Mensaje gestionado por el llamador */ }
-                                showContextMenu = false
-                            }
-                        )
+                        DropdownMenuItem(text = { Text("Descargar") }, onClick = { onDownloadEpisode(episodio) { /* msg */ }; showContextMenu = false })
                     }
 
                     if (isInQueue) {
-                        DropdownMenuItem(
-                            text = { Text("Eliminar de cola") },
-                            onClick = {
-                                onRemoveFromQueue(episodio)
-                                showContextMenu = false
-                            }
-                        )
+                        DropdownMenuItem(text = { Text("Eliminar de cola") }, onClick = { onRemoveFromQueue(episodio); showContextMenu = false })
                     } else {
-                        DropdownMenuItem(
-                            text = { Text("Añadir a cola") },
-                            onClick = {
-                                onAddToQueue(episodio)
-                                showContextMenu = false
-                            }
-                        )
+                        DropdownMenuItem(text = { Text("Añadir a cola") }, onClick = { onAddToQueue(episodio); showContextMenu = false })
                     }
                 }
             }

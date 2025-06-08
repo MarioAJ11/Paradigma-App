@@ -49,16 +49,15 @@ import kotlinx.coroutines.launch
 /**
  * Define el grafo de navegación principal de la aplicación.
  * Este composable actúa como el orquestador central de la UI, gestionando:
- * - La estructura de la pantalla (con un Box para la UI flotante).
+ * - La estructura de la pantalla con una UI de reproductor flotante.
  * - La navegación entre las diferentes pantallas a través de un [NavHost].
- * - La recolección de estado de los ViewModels principales.
- * - La presentación de los componentes persistentes como el [AudioPlayer] y la [BottomNavigationBar].
+ * - La recolección de estado de los ViewModels para actualizar la UI.
+ * - La inyección de dependencias (ViewModels) en cada pantalla que las necesite.
  *
- * @param navController El [NavHostController] para la navegación. Por defecto, crea uno nuevo.
+ * @param navController El [NavHostController] para la navegación.
  * @param viewModelFactory La factoría para crear instancias de ViewModels con dependencias.
  * @param mainViewModel Instancia del [MainViewModel] global.
  * @param searchViewModel Instancia del [SearchViewModel] para la búsqueda.
- *
  * @author Mario Alguacil Juárez
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -98,23 +97,24 @@ fun NavGraph(
         },
         sheetPeekHeight = 0.dp,
     ) {
-        // Usamos un Box como contenedor principal para poder superponer la barra inferior
-        // sobre el contenido de la pantalla.
+        // Usamos un Box para superponer la barra inferior sobre el contenido de la pantalla.
         Box(modifier = Modifier.fillMaxSize()) {
 
-            // 1. El NavHost se coloca primero, ocupando todo el fondo.
+            // El NavHost contiene todas las pantallas de la app.
             NavHost(
                 navController = navController,
                 startDestination = Screen.Home.route,
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Aquí se definen todas las rutas/pantallas de la aplicación.
+                // Ruta para la pantalla principal (Home).
                 composable(Screen.Home.route) {
                     HomeScreen(
                         mainViewModel = mainViewModel,
                         onProgramaSelected = { progId, progNombre -> navController.navigate(Screen.Programa.createRoute(progId, progNombre)) }
                     )
                 }
+
+                // Ruta para la pantalla de detalles de un Programa.
                 composable(
                     route = Screen.Programa.route,
                     arguments = listOf(navArgument("programaId") { type = NavType.IntType }, navArgument("programaNombre") { type = NavType.StringType })
@@ -122,18 +122,58 @@ fun NavGraph(
                     val programaViewModel: ProgramaViewModel = viewModel(key = "programa_vm_${navBackStackEntry.arguments?.getInt("programaId")}", viewModelStoreOwner = navBackStackEntry, factory = viewModelFactory)
                     ProgramaScreen(programaViewModel, mainViewModel, queueViewModel, downloadedViewModel, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() })
                 }
+
+                // Ruta para la pantalla de Búsqueda.
                 composable(Screen.Search.route) {
-                    SearchScreen(searchViewModel, queueViewModel, downloadedViewModel, onEpisodeSelected = { mainViewModel.selectEpisode(it) }, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() })
+                    SearchScreen(
+                        searchViewModel = searchViewModel,
+                        mainViewModel = mainViewModel, // Pasamos mainViewModel para el estado de carga
+                        queueViewModel = queueViewModel,
+                        downloadedViewModel = downloadedViewModel,
+                        onEpisodeSelected = { mainViewModel.selectEpisode(it) },
+                        onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) },
+                        onBackClick = { navController.popBackStack() }
+                    )
                 }
+
+                // Ruta para la pantalla de Descargas.
                 composable(Screen.Downloads.route) {
-                    DownloadedEpisodioScreen(downloadedViewModel, queueViewModel, onEpisodeSelected = { mainViewModel.selectEpisode(it) }, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() })
+                    DownloadedEpisodioScreen(
+                        downloadedEpisodioViewModel = downloadedViewModel,
+                        mainViewModel = mainViewModel, // Pasamos mainViewModel para el estado de carga
+                        queueViewModel = queueViewModel,
+                        onEpisodeSelected = { mainViewModel.selectEpisode(it) },
+                        onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) },
+                        onBackClick = { navController.popBackStack() }
+                    )
                 }
+
+                // Ruta para la pantalla de Cola de Reproducción.
                 composable(Screen.Queue.route) {
-                    QueueScreen(queueViewModel, downloadedViewModel, onEpisodeSelected = { mainViewModel.selectEpisode(it) }, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() })
+                    QueueScreen(
+                        queueViewModel = queueViewModel,
+                        mainViewModel = mainViewModel, // Pasamos mainViewModel para el estado de carga
+                        downloadedViewModel = downloadedViewModel,
+                        onEpisodeSelected = { mainViewModel.selectEpisode(it) },
+                        onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) },
+                        onBackClick = { navController.popBackStack() }
+                    )
                 }
+
+                // Ruta para la pantalla de "Seguir Escuchando".
                 composable(Screen.OnGoing.route) {
-                    OnGoingEpisodioScreen(onGoingViewModel, queueViewModel, downloadedViewModel, onEpisodeSelected = { mainViewModel.selectEpisode(it) }, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() })
+                    OnGoingEpisodioScreen(
+                        onGoingEpisodioViewModel = onGoingViewModel,
+                        mainViewModel = mainViewModel, // Pasamos mainViewModel para el estado de carga
+                        queueViewModel = queueViewModel,
+                        downloadedViewModel = downloadedViewModel,
+                        onEpisodeSelected = { mainViewModel.selectEpisode(it) },
+                        onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) },
+                        onBackClick = { navController.popBackStack() }
+                    )
                 }
+
+                // Ruta para la pantalla de detalles de un Episodio.
                 composable(
                     route = Screen.EpisodeDetail.route,
                     arguments = listOf(navArgument("episodeId") { type = NavType.IntType })
@@ -141,17 +181,18 @@ fun NavGraph(
                     val episodeDetailViewModel: EpisodeDetailViewModel = viewModel(key = "episode_detail_vm_${navBackStackEntry.arguments?.getInt("episodeId")}", viewModelStoreOwner = navBackStackEntry, factory = viewModelFactory)
                     EpisodeDetailScreen(episodeDetailViewModel, mainViewModel, queueViewModel, downloadedViewModel, onBackClick = { navController.popBackStack() })
                 }
+
+                // Ruta para la pantalla de Ajustes.
                 composable(Screen.Settings.route) {
                     SettingsScreen(settingsViewModel = settingsViewModel, onBackClick = { navController.popBackStack() })
                 }
             }
 
-            // 2. La barra inferior se coloca después, por lo que se dibuja ENCIMA del NavHost.
+            // La barra inferior (reproductor y navegación) se dibuja ENCIMA del NavHost.
             Column(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter) // Se alinea en la parte inferior del Box.
+                    .align(Alignment.BottomCenter)
                     .background(
-                        // Se aplica un degradado para el efecto de "sombra".
                         brush = Brush.verticalGradient(
                             colors = listOf(
                                 Color.Transparent,
@@ -161,6 +202,7 @@ fun NavGraph(
                         )
                     )
             ) {
+                // Reproductor de audio global.
                 AudioPlayer(
                     activePlayer = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer else mainViewModel.andainaStreamPlayer.exoPlayer,
                     currentEpisode = currentPlayingEpisode,
@@ -184,6 +226,7 @@ fun NavGraph(
                     }
                 )
 
+                // Barra de navegación inferior.
                 BottomNavigationBar(
                     navController = navController
                 )
