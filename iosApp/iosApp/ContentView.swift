@@ -1,45 +1,59 @@
 import SwiftUI
 import shared
 
+/**
+ * La vista raíz que contiene la estructura principal de la aplicación.
+ *
+ * Utiliza un ZStack para superponer el reproductor de audio (`AudioPlayerView`)
+ * sobre la navegación principal por pestañas (`TabView`).
+ */
 struct ContentView: View {
-    // Con @StateObject, creamos y mantenemos viva una instancia de nuestro ViewModel
-    // mientras la vista esté activa.
-    @StateObject private var viewModel = ProgramsViewModel()
+
+    @EnvironmentObject var audioManager: AudioManager
+    @EnvironmentObject var queueViewModel: QueueViewModel
+    @EnvironmentObject var downloadedViewModel: DownloadedViewModel
+    @EnvironmentObject var onGoingViewModel: OnGoingViewModel
+
+    /// Define las pestañas disponibles en la barra de navegación inferior.
+    enum Tab {
+        case inicio, buscar, continuar, descargas, cola, ajustes
+    }
+
+    @State private var selection: Tab = .inicio
 
     var body: some View {
-        NavigationView {
-            // La vista cambia dependiendo del estado del ViewModel
-            VStack {
-                if viewModel.isLoading {
-                    // Muestra un indicador de progreso mientras carga
-                    ProgressView("Cargando programas...")
-                } else if let errorMessage = viewModel.errorMessage {
-                    // Muestra un mensaje de error si algo falló
-                    Text("Error: \(errorMessage)")
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                } else {
-                    // Muestra la lista de programas si todo fue bien
-                    List(viewModel.programs, id: \.id) { programa in
-                        ProgramRow(programa: programa)
-                            .listRowInsets(EdgeInsets()) // Quita los paddings por defecto de la fila
-                            .padding(.vertical, 4)
-                    }
-                    .listStyle(.plain) // Un estilo de lista simple
-                }
-            }
-            .navigationTitle("Programas") // Título en la barra de navegación
-            .onAppear {
-                // Cuando la vista aparece por primera vez, le pide al ViewModel que cargue los datos.
-                viewModel.loadPrograms()
-            }
-        }
-    }
-}
+        ZStack(alignment: .bottom) {
+            TabView(selection: $selection) {
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
+                HomeScreen()
+                    .tabItem { Label("Inicio", systemImage: "house.fill") }
+                    .tag(Tab.inicio)
+
+                SearchView()
+                    .tabItem { Label("Buscar", systemImage: "magnifyingglass") }
+                    .tag(Tab.buscar)
+
+                OnGoingView()
+                    .tabItem { Label("Continuar", systemImage: "hourglass") }
+                    .tag(Tab.continuar)
+
+                DownloadedView()
+                    .tabItem { Label("Descargas", systemImage: "arrow.down.circle.fill") }
+                    .tag(Tab.descargas)
+
+                QueueView()
+                    .tabItem { Label("Cola", systemImage: "list.bullet") }
+                    .tag(Tab.cola)
+
+                SettingsView()
+                    .tabItem { Label("Ajustes", systemImage: "gear") }
+                    .tag(Tab.ajustes)
+            }
+
+            // La vista del reproductor de audio se muestra en la parte inferior de todas las pantallas.
+            AudioPlayerView()
+                .padding(.bottom, 48)
+                .ignoresSafeArea(.keyboard) // Evita que el reproductor suba con el teclado en la pantalla de búsqueda.
+        }
     }
 }
