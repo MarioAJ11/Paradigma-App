@@ -1,14 +1,13 @@
 package com.example.paradigmaapp.android.navigation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.BottomSheetScaffold
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,38 +26,21 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.paradigmaapp.android.audio.AudioPlayer
 import com.example.paradigmaapp.android.audio.VolumeControl
-import com.example.paradigmaapp.android.screens.DownloadedEpisodioScreen
-import com.example.paradigmaapp.android.screens.EpisodeDetailScreen
-import com.example.paradigmaapp.android.screens.HomeScreen
-import com.example.paradigmaapp.android.screens.OnGoingEpisodioScreen
-import com.example.paradigmaapp.android.screens.ProgramaScreen
-import com.example.paradigmaapp.android.screens.QueueScreen
-import com.example.paradigmaapp.android.screens.SearchScreen
-import com.example.paradigmaapp.android.screens.SettingsScreen
-import com.example.paradigmaapp.android.viewmodel.DownloadedEpisodioViewModel
-import com.example.paradigmaapp.android.viewmodel.EpisodeDetailViewModel
-import com.example.paradigmaapp.android.viewmodel.MainViewModel
-import com.example.paradigmaapp.android.viewmodel.OnGoingEpisodioViewModel
-import com.example.paradigmaapp.android.viewmodel.ProgramaViewModel
-import com.example.paradigmaapp.android.viewmodel.QueueViewModel
-import com.example.paradigmaapp.android.viewmodel.SearchViewModel
-import com.example.paradigmaapp.android.viewmodel.SettingsViewModel
-import com.example.paradigmaapp.android.viewmodel.ViewModelFactory
+import com.example.paradigmaapp.android.screens.*
+import com.example.paradigmaapp.android.viewmodel.*
 import kotlinx.coroutines.launch
 
 /**
- * Define el grafo de navegación principal de la aplicación.
- * Este composable actúa como el orquestador central de la UI, gestionando:
- * - La estructura de la pantalla con una UI de reproductor flotante.
- * - La navegación entre las diferentes pantallas a través de un [NavHost].
- * - La recolección de estado de los ViewModels para actualizar la UI.
- * - La inyección de dependencias (ViewModels) en cada pantalla que las necesite.
+ * Define el grafo de navegación para la aplicación principal, una vez que el usuario
+ * ha completado el onboarding.
+ * Gestiona la estructura de la UI con el reproductor y la barra de navegación persistentes,
+ * y define todas las rutas navegables (pantallas) de la app.
  *
- * @param navController El [NavHostController] para la navegación.
- * @param viewModelFactory La factoría para crear instancias de ViewModels con dependencias.
- * @param mainViewModel Instancia del [MainViewModel] global.
- * @param searchViewModel Instancia del [SearchViewModel] para la búsqueda.
  * @author Mario Alguacil Juárez
+ * @param navController El controlador de navegación para moverse entre pantallas.
+ * @param viewModelFactory La factoría para crear instancias de ViewModels.
+ * @param mainViewModel El ViewModel principal que gestiona el estado global.
+ * @param searchViewModel El ViewModel para la funcionalidad de búsqueda.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,7 +50,7 @@ fun NavGraph(
     mainViewModel: MainViewModel,
     searchViewModel: SearchViewModel
 ) {
-    // Recolecta los estados de los ViewModels. La UI se recompondrá cuando estos estados cambien.
+    // Recolecta los estados del ViewModel para que la UI se actualice en tiempo real.
     val coroutineScope = rememberCoroutineScope()
     val currentPlayingEpisode by mainViewModel.currentPlayingEpisode.collectAsState()
     val isPodcastPlaying by mainViewModel.isPodcastPlaying.collectAsState()
@@ -79,158 +61,101 @@ fun NavGraph(
     val volumeFromViewModel by mainViewModel.currentVolume.collectAsState()
     val andainaRadioInfo by mainViewModel.andainaRadioInfo.collectAsState()
     val volumeBottomSheetScaffoldState = rememberBottomSheetScaffoldState()
+    val isFullScreenPlayerVisible by mainViewModel.isFullScreenPlayerVisible.collectAsState()
 
-    // Obtiene instancias de los ViewModels que se pasarán a las pantallas.
-    val queueViewModel: QueueViewModel = mainViewModel.queueViewModel
-    val downloadedViewModel: DownloadedEpisodioViewModel = mainViewModel.downloadedViewModel
-    val onGoingViewModel: OnGoingEpisodioViewModel = mainViewModel.onGoingViewModel
-    val settingsViewModel: SettingsViewModel = viewModel(factory = viewModelFactory)
-
-    // Contenedor para la hoja de control de volumen que se desliza desde abajo.
-    BottomSheetScaffold(
-        scaffoldState = volumeBottomSheetScaffoldState,
-        sheetContent = {
-            VolumeControl(
-                currentVolume = volumeFromViewModel,
-                onVolumeChanged = { newVolume -> mainViewModel.setVolume(newVolume) }
-            )
-        },
-        sheetPeekHeight = 0.dp,
-    ) {
-        // Usamos un Box para superponer la barra inferior sobre el contenido de la pantalla.
-        Box(modifier = Modifier.fillMaxSize()) {
-
-            // El NavHost contiene todas las pantallas de la app.
-            NavHost(
-                navController = navController,
-                startDestination = Screen.Home.route,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // Ruta para la pantalla principal (Home).
-                composable(Screen.Home.route) {
-                    HomeScreen(
-                        mainViewModel = mainViewModel,
-                        onProgramaSelected = { progId, progNombre -> navController.navigate(Screen.Programa.createRoute(progId, progNombre)) }
-                    )
+    // Contenedor principal que permite superponer vistas.
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Hoja inferior para el control de volumen.
+        BottomSheetScaffold(
+            scaffoldState = volumeBottomSheetScaffoldState,
+            sheetContent = {
+                VolumeControl(
+                    currentVolume = volumeFromViewModel,
+                    onVolumeChanged = { newVolume -> mainViewModel.setVolume(newVolume) }
+                )
+            },
+            sheetPeekHeight = 0.dp, // La hoja está oculta por defecto.
+        ) {
+            // Contenedor para el contenido principal y la barra inferior.
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Host de navegación que gestiona el cambio entre pantallas.
+                NavHost(
+                    navController = navController,
+                    startDestination = Screen.Home.route, // La app siempre empieza en Home.
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Define cada una de las pantallas (rutas) de la aplicación.
+                    composable(Screen.Home.route) {
+                        HomeScreen(
+                            mainViewModel = mainViewModel,
+                            onProgramaSelected = { progId, progNombre -> navController.navigate(Screen.Programa.createRoute(progId, progNombre)) }
+                        )
+                    }
+                    composable(route = Screen.Programa.route, arguments = listOf(navArgument("programaId") { type = NavType.IntType }, navArgument("programaNombre") { type = NavType.StringType })) { navBackStackEntry -> val programaViewModel: ProgramaViewModel = viewModel(key = "programa_vm_${navBackStackEntry.arguments?.getInt("programaId")}", viewModelStoreOwner = navBackStackEntry, factory = viewModelFactory); ProgramaScreen(programaViewModel, mainViewModel, mainViewModel.queueViewModel, mainViewModel.downloadedViewModel, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() }) }
+                    composable(Screen.Search.route) { SearchScreen(searchViewModel = searchViewModel, mainViewModel = mainViewModel, queueViewModel = mainViewModel.queueViewModel, downloadedViewModel = mainViewModel.downloadedViewModel, onEpisodeSelected = { mainViewModel.selectEpisode(it) }, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() }) }
+                    composable(Screen.Downloads.route) { DownloadedEpisodioScreen(downloadedEpisodioViewModel = mainViewModel.downloadedViewModel, mainViewModel = mainViewModel, queueViewModel = mainViewModel.queueViewModel, onEpisodeSelected = { mainViewModel.selectEpisode(it) }, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() }) }
+                    composable(Screen.Queue.route) { QueueScreen(queueViewModel = mainViewModel.queueViewModel, mainViewModel = mainViewModel, downloadedViewModel = mainViewModel.downloadedViewModel, onEpisodeSelected = { mainViewModel.selectEpisode(it) }, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() }) }
+                    composable(Screen.OnGoing.route) { OnGoingEpisodioScreen(onGoingEpisodioViewModel = mainViewModel.onGoingViewModel, mainViewModel = mainViewModel, queueViewModel = mainViewModel.queueViewModel, downloadedViewModel = mainViewModel.downloadedViewModel, onEpisodeSelected = { mainViewModel.selectEpisode(it) }, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() }) }
+                    composable(route = Screen.EpisodeDetail.route, arguments = listOf(navArgument("episodeId") { type = NavType.IntType })) { navBackStackEntry -> val episodeDetailViewModel: EpisodeDetailViewModel = viewModel(key = "episode_detail_vm_${navBackStackEntry.arguments?.getInt("episodeId")}", viewModelStoreOwner = navBackStackEntry, factory = viewModelFactory); EpisodeDetailScreen(episodeDetailViewModel, mainViewModel, mainViewModel.queueViewModel, mainViewModel.downloadedViewModel, onBackClick = { navController.popBackStack() }) }
+                    composable(Screen.Settings.route) { SettingsScreen(settingsViewModel = viewModel(factory = viewModelFactory), onBackClick = { navController.popBackStack() }) }
                 }
 
-                // Ruta para la pantalla de detalles de un Programa.
-                composable(
-                    route = Screen.Programa.route,
-                    arguments = listOf(navArgument("programaId") { type = NavType.IntType }, navArgument("programaNombre") { type = NavType.StringType })
-                ) { navBackStackEntry ->
-                    val programaViewModel: ProgramaViewModel = viewModel(key = "programa_vm_${navBackStackEntry.arguments?.getInt("programaId")}", viewModelStoreOwner = navBackStackEntry, factory = viewModelFactory)
-                    ProgramaScreen(programaViewModel, mainViewModel, queueViewModel, downloadedViewModel, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() })
-                }
-
-                // Ruta para la pantalla de Búsqueda.
-                composable(Screen.Search.route) {
-                    SearchScreen(
-                        searchViewModel = searchViewModel,
-                        mainViewModel = mainViewModel, // Pasamos mainViewModel para el estado de carga
-                        queueViewModel = queueViewModel,
-                        downloadedViewModel = downloadedViewModel,
-                        onEpisodeSelected = { mainViewModel.selectEpisode(it) },
-                        onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) },
-                        onBackClick = { navController.popBackStack() }
-                    )
-                }
-
-                // Ruta para la pantalla de Descargas.
-                composable(Screen.Downloads.route) {
-                    DownloadedEpisodioScreen(
-                        downloadedEpisodioViewModel = downloadedViewModel,
-                        mainViewModel = mainViewModel, // Pasamos mainViewModel para el estado de carga
-                        queueViewModel = queueViewModel,
-                        onEpisodeSelected = { mainViewModel.selectEpisode(it) },
-                        onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) },
-                        onBackClick = { navController.popBackStack() }
-                    )
-                }
-
-                // Ruta para la pantalla de Cola de Reproducción.
-                composable(Screen.Queue.route) {
-                    QueueScreen(
-                        queueViewModel = queueViewModel,
-                        mainViewModel = mainViewModel, // Pasamos mainViewModel para el estado de carga
-                        downloadedViewModel = downloadedViewModel,
-                        onEpisodeSelected = { mainViewModel.selectEpisode(it) },
-                        onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) },
-                        onBackClick = { navController.popBackStack() }
-                    )
-                }
-
-                // Ruta para la pantalla de "Seguir Escuchando".
-                composable(Screen.OnGoing.route) {
-                    OnGoingEpisodioScreen(
-                        onGoingEpisodioViewModel = onGoingViewModel,
-                        mainViewModel = mainViewModel, // Pasamos mainViewModel para el estado de carga
-                        queueViewModel = queueViewModel,
-                        downloadedViewModel = downloadedViewModel,
-                        onEpisodeSelected = { mainViewModel.selectEpisode(it) },
-                        onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) },
-                        onBackClick = { navController.popBackStack() }
-                    )
-                }
-
-                // Ruta para la pantalla de detalles de un Episodio.
-                composable(
-                    route = Screen.EpisodeDetail.route,
-                    arguments = listOf(navArgument("episodeId") { type = NavType.IntType })
-                ) { navBackStackEntry ->
-                    val episodeDetailViewModel: EpisodeDetailViewModel = viewModel(key = "episode_detail_vm_${navBackStackEntry.arguments?.getInt("episodeId")}", viewModelStoreOwner = navBackStackEntry, factory = viewModelFactory)
-                    EpisodeDetailScreen(episodeDetailViewModel, mainViewModel, queueViewModel, downloadedViewModel, onBackClick = { navController.popBackStack() })
-                }
-
-                // Ruta para la pantalla de Ajustes.
-                composable(Screen.Settings.route) {
-                    SettingsScreen(settingsViewModel = settingsViewModel, onBackClick = { navController.popBackStack() })
-                }
-            }
-
-            // La barra inferior (reproductor y navegación) se dibuja ENCIMA del NavHost.
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                MaterialTheme.colorScheme.surface
+                // UI persistente en la parte inferior (reproductor y menú).
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                    MaterialTheme.colorScheme.surface
+                                )
                             )
                         )
-                    )
-            ) {
-                // Reproductor de audio global.
-                AudioPlayer(
-                    activePlayer = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer else mainViewModel.andainaStreamPlayer.exoPlayer,
-                    currentEpisode = currentPlayingEpisode,
-                    andainaRadioInfo = andainaRadioInfo,
-                    isPlayingGeneral = isPlayingGeneral,
-                    episodeProgress = episodeProgress,
-                    onProgressChange = { newProgress -> mainViewModel.seekEpisodeTo(newProgress) },
-                    isAndainaStreamActive = isAndainaStreamActive,
-                    isAndainaPlaying = isAndainaPlaying,
-                    onPlayPauseClick = { mainViewModel.onPlayerPlayPauseClick() },
-                    onPlayStreamingClick = { mainViewModel.toggleAndainaStreamActive() },
-                    onEpisodeInfoClick = { episodio -> navController.navigate(Screen.EpisodeDetail.createRoute(episodio.id)) },
-                    onVolumeIconClick = {
-                        coroutineScope.launch {
-                            if (volumeBottomSheetScaffoldState.bottomSheetState.currentValue == SheetValue.Expanded) {
-                                volumeBottomSheetScaffoldState.bottomSheetState.partialExpand()
-                            } else {
-                                volumeBottomSheetScaffoldState.bottomSheetState.expand()
+                ) {
+                    // Reproductor de audio global.
+                    AudioPlayer(
+                        activePlayer = if (currentPlayingEpisode != null) mainViewModel.podcastExoPlayer else mainViewModel.andainaStreamPlayer.exoPlayer,
+                        currentEpisode = currentPlayingEpisode,
+                        andainaRadioInfo = andainaRadioInfo,
+                        isPlayingGeneral = isPlayingGeneral,
+                        episodeProgress = episodeProgress,
+                        onProgressChange = { newProgress -> mainViewModel.seekEpisodeTo(newProgress) },
+                        isAndainaStreamActive = isAndainaStreamActive,
+                        isAndainaPlaying = isAndainaPlaying,
+                        onPlayPauseClick = { mainViewModel.onPlayerPlayPauseClick() },
+                        onPlayStreamingClick = { mainViewModel.toggleAndainaStreamActive() },
+                        onEpisodeInfoClick = { mainViewModel.toggleFullScreenPlayer() },
+                        onVolumeIconClick = {
+                            coroutineScope.launch {
+                                if (volumeBottomSheetScaffoldState.bottomSheetState.currentValue == SheetValue.Expanded) {
+                                    volumeBottomSheetScaffoldState.bottomSheetState.partialExpand()
+                                } else {
+                                    volumeBottomSheetScaffoldState.bottomSheetState.expand()
+                                }
                             }
                         }
-                    }
-                )
+                    )
 
-                // Barra de navegación inferior.
-                BottomNavigationBar(
-                    navController = navController
-                )
+                    // Barra de navegación inferior.
+                    BottomNavigationBar(
+                        navController = navController
+                    )
+                }
             }
+        }
+
+        // El reproductor a pantalla completa se muestra por encima de todo cuando está visible.
+        AnimatedVisibility(
+            visible = isFullScreenPlayerVisible,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it })
+        ) {
+            FullScreenPlayerScreen(
+                mainViewModel = mainViewModel,
+                onBackClick = { mainViewModel.toggleFullScreenPlayer() }
+            )
         }
     }
 }

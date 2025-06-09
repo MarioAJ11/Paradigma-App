@@ -12,6 +12,9 @@ import android.net.Uri
  * @author Mario Alguacil Juárez
  */
 sealed class Screen(val route: String) {
+    /** Pantalla de inicio de la aplicación. */
+    object Onboarding : Screen("onboarding_screen")
+
     /** Pantalla principal que muestra la lista de programas. */
     object Home : Screen("home_screen")
 
@@ -41,7 +44,7 @@ sealed class Screen(val route: String) {
          * @return La cadena de ruta formateada.
          */
         fun createRoute(programaId: Int, programaNombre: String): String {
-            val encodedNombre = Uri.encode(programaNombre) //
+            val encodedNombre = Uri.encode(programaNombre)
             return "programa_screen/$programaId/$encodedNombre"
         }
     }
@@ -50,7 +53,7 @@ sealed class Screen(val route: String) {
      * Pantalla que muestra los detalles de un episodio específico.
      * Requiere `episodeId` como argumento de navegación.
      */
-    object EpisodeDetail : Screen("episode_detail_screen/{episodeId}") { //
+    object EpisodeDetail : Screen("episode_detail_screen/{episodeId}") {
         /**
          * Crea la ruta completa para navegar a la pantalla de detalle de un episodio.
          *
@@ -63,5 +66,8 @@ sealed class Screen(val route: String) {
     }
 
     /** Pantalla de Ajustes de la aplicación. */
-    object Settings : Screen("settings_screen") // Añadida la pantalla de Ajustes
+    object Settings : Screen("settings_screen")
+
+    /** Pantalla del reproductor a pantalla completa. */
+    object FullScreenPlayer : Screen("full_screen_player_screen")
 }

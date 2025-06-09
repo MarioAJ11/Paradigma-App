@@ -36,22 +36,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // --- INICIALIZACIÓN DE DEPENDENCIAS ---
         // Este es el lugar central donde se crean los objetos que la app necesita para funcionar.
-
-        // 1. Preferencias locales (para ajustes, cola de reproducción, etc.)
         val appPreferencesInstance = AppPreferences(applicationContext)
 
-        // 2. Base de datos (SQLDelight)
         // Creamos la factoría de drivers específica para Android y luego la instancia de la base de datos.
         val databaseDriverFactory = DatabaseDriverFactory(applicationContext)
         val database = Database(databaseDriverFactory)
 
-        // 3. Repositorio principal
         // Creamos el repositorio y le pasamos la base de datos para que pueda usarla como caché.
         val paradigmaRepository = ParadigmaRepository(database)
 
-        // 4. Factoría de ViewModels
         // Creamos la factoría que se encargará de crear todos los ViewModels,
         // pasándoles las dependencias que necesitan.
         viewModelFactory = ViewModelFactory(
@@ -61,17 +55,14 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            // Obtenemos el ViewModel de ajustes para gestionar el tema de la app.
             val settingsViewModel: SettingsViewModel = ViewModelProvider(this, viewModelFactory)[SettingsViewModel::class.java]
             val manualDarkThemeSetting by settingsViewModel.isManuallySetToDarkTheme.collectAsState()
 
-            // Aplicamos el tema de la aplicación.
             Theme(manualDarkThemeSetting = manualDarkThemeSetting) {
-                // Obtenemos las instancias de los ViewModels principales que usará la app.
                 val mainViewModel: MainViewModel = ViewModelProvider(this, viewModelFactory)[MainViewModel::class.java]
                 val searchViewModel: SearchViewModel = ViewModelProvider(this, viewModelFactory)[SearchViewModel::class.java]
 
-                // Composable raíz que contiene toda la navegación y la UI.
+                // La llamada ahora es más sencilla
                 ParadigmaApp(
                     viewModelFactory = viewModelFactory,
                     mainViewModel = mainViewModel,

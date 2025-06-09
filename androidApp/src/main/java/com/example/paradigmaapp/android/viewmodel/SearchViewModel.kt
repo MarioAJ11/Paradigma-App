@@ -97,36 +97,39 @@ class SearchViewModel(
             _isSearching.value = true
             _searchError.value = null
 
-            // 1. Búsqueda local para resultados instantáneos.
+            // 1. Búsqueda local para resultados instantáneos (sin cambios).
             val localResults = (episodioRepository as? ParadigmaRepository)
                 ?.buscarEpisodiosEnCache(query) ?: emptyList()
             _searchResults.value = localResults
 
-            // 2. Búsqueda en red para resultados completos.
+            // 2. Búsqueda en red para resultados completos y manejo de errores mejorado.
             try {
                 val networkResults = episodioRepository.buscarEpisodios(query)
 
-                // Combina resultados locales y de red, eliminando duplicados.
+                // Combina y elimina duplicados
                 val combinedResults = (localResults + networkResults).distinctBy { it.id }
 
                 if (combinedResults.isNotEmpty()) {
                     _searchResults.value = combinedResults
+                    // Limpiamos cualquier error previo si ahora encontramos resultados.
+                    _searchError.value = null
                 } else {
+                    // Si, tras buscar en la red, la lista combinada sigue vacía,
+                    // es una búsqueda sin resultados, NO un error.
                     _searchResults.value = emptyList()
-                    _searchError.value = "No se encontraron episodios para \"$query\"."
+                    _searchError.value = "Búsqueda no encontrada para \"$query\"."
                 }
 
             } catch (e: NoInternetException) {
-                // Si no hay internet, nos quedamos con los resultados locales y mostramos un mensaje.
                 val errorMessage = if (localResults.isEmpty()) {
-                    e.message ?: "Sin conexión a internet."
+                    "No se pudo conectar. Revisa tu conexión a internet."
                 } else {
                     "Mostrando resultados locales. Se requiere conexión para una búsqueda completa."
                 }
                 _searchError.value = errorMessage
             } catch (e: Exception) {
-                // Manejo de otros errores de red o del servidor.
                 _searchError.value = "Ocurrió un error al realizar la búsqueda."
+                // Si hay un error y no teníamos resultados locales, limpiamos la lista.
                 if (localResults.isEmpty()) _searchResults.value = emptyList()
             } finally {
                 _isSearching.value = false

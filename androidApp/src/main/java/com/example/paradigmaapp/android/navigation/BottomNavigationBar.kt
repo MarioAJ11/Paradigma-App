@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.paradigmaapp.android.ui.BottomNavItem
+import com.example.paradigmaapp.android.ui.navigateToScreenIfDifferent
 
 /**
  * Composable que representa la barra de navegación inferior con comportamiento dinámico.

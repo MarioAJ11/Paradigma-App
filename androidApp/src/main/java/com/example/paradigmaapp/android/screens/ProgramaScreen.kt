@@ -40,6 +40,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.example.paradigmaapp.android.ui.EpisodioListItem
 import com.example.paradigmaapp.android.ui.ErrorView
+import com.example.paradigmaapp.android.ui.ProgramaInfoHeader
 import com.example.paradigmaapp.android.viewmodel.DownloadedEpisodioViewModel
 import com.example.paradigmaapp.android.viewmodel.MainViewModel
 import com.example.paradigmaapp.android.viewmodel.ProgramaViewModel

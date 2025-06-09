@@ -30,14 +30,30 @@ class AppPreferences(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     companion object {
-        private const val PREFS_NAME = "ParadigmaAppPrefsV2" //
-        private const val PREF_CURRENT_EPISODE_ID = "currentEpisodeId_v2" //
-        private const val PREF_IS_STREAM_ACTIVE = "isStreamActive_v2" //
-        private const val PREF_EPISODE_POSITIONS = "episodePositions_v2" //
-        private const val PREF_EPISODE_QUEUE_IDS = "episodeQueueIds_v2" //
-        private const val PREF_DOWNLOADED_EPISODIOS = "downloadedEpisodios_v1" // Clave para la lista de objetos Episodio descargados
-        private const val PREF_EPISODE_DETAILS_MAP = "episodeDetailsMap_v1" // Clave para guardar detalles de episodios individuales
-        private const val PREF_MANUALLY_SET_DARK_THEME = "manuallySetDarkTheme_v1" // Clave para la preferencia de tema manual
+        private const val PREFS_NAME = "ParadigmaAppPrefsV2"
+        private const val PREF_CURRENT_EPISODE_ID = "currentEpisodeId_v2"
+        private const val PREF_IS_STREAM_ACTIVE = "isStreamActive_v2"
+        private const val PREF_EPISODE_POSITIONS = "episodePositions_v2"
+        private const val PREF_EPISODE_QUEUE_IDS = "episodeQueueIds_v2"
+        private const val PREF_DOWNLOADED_EPISODIOS = "downloadedEpisodios_v1"
+        private const val PREF_EPISODE_DETAILS_MAP = "episodeDetailsMap_v1"
+        private const val PREF_ONBOARDING_COMPLETE = "onboardingComplete_v1"
+        private const val PREF_MANUALLY_SET_DARK_THEME = "manuallySetDarkTheme_v1"
+    }
+
+    /**
+     * Guarda si el usuario ha completado la pantalla de introducción.
+     */
+    fun saveOnboardingComplete(isComplete: Boolean) {
+        prefs.edit().putBoolean(PREF_ONBOARDING_COMPLETE, isComplete).apply()
+    }
+
+    /**
+     * Comprueba si el usuario ha completado la pantalla de introducción.
+     * @return `true` si ya la ha completado, `false` si es la primera vez.
+     */
+    fun loadOnboardingComplete(): Boolean {
+        return prefs.getBoolean(PREF_ONBOARDING_COMPLETE, false)
     }
 
     /**

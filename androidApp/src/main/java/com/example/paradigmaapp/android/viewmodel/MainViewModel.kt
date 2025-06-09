@@ -95,9 +95,22 @@ class MainViewModel(
     private val _preparingEpisodeId = MutableStateFlow<Int?>(null)
     val preparingEpisodeId: StateFlow<Int?> = _preparingEpisodeId.asStateFlow()
 
+    private val _isFullScreenPlayerVisible = MutableStateFlow(false)
+    val isFullScreenPlayerVisible: StateFlow<Boolean> = _isFullScreenPlayerVisible.asStateFlow()
+
+    private val _hasNextEpisode = MutableStateFlow(false)
+    val hasNextEpisode: StateFlow<Boolean> = _hasNextEpisode.asStateFlow()
+
+    private val _hasPreviousEpisode = MutableStateFlow(false)
+    val hasPreviousEpisode: StateFlow<Boolean> = _hasPreviousEpisode.asStateFlow()
+
+    private val _onboardingCompleted = MutableStateFlow(appPreferences.loadOnboardingComplete())
+    val onboardingCompleted: StateFlow<Boolean> = _onboardingCompleted.asStateFlow()
+
     private val _andainaRadioInfo = MutableStateFlow<RadioInfo?>(null)
-    /** Contiene la información actual del stream de Andaina FM (título, artista, etc.). Es nulo si no hay información disponible. */
     val andainaRadioInfo: StateFlow<RadioInfo?> = _andainaRadioInfo.asStateFlow()
+
+    private val _contextualPlaylist = MutableStateFlow<List<Episodio>>(emptyList())
 
     val podcastExoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
     val andainaStreamPlayer: AndainaStream = AndainaStream(context)
@@ -118,6 +131,17 @@ class MainViewModel(
         startRadioInfoUpdates()
         observeCurrentPlayingEpisode()
         observeAndainaStreamActive()
+
+        viewModelScope.launch {
+            _currentPlayingEpisode.collect {
+                updateNextPreviousState()
+            }
+        }
+        viewModelScope.launch {
+            queueViewModel.queueEpisodios.collect {
+                updateNextPreviousState()
+            }
+        }
     }
 
     /** Carga la lista inicial de programas desde el repositorio. */
@@ -157,7 +181,8 @@ class MainViewModel(
                         try {
                             episodeToRestore = episodioRepository.getEpisodio(id)
                             episodeToRestore?.let { appPreferences.saveEpisodioDetails(it) }
-                        } catch (e: Exception) { /* Ignorar error de red */ }
+                        } catch (e: Exception) { /* Ignorar error de red */
+                        }
                     }
                     episodeToRestore?.let { episodio ->
                         val savedPosition = appPreferences.getEpisodePosition(episodio.id)
@@ -173,7 +198,13 @@ class MainViewModel(
         }
     }
 
-    //<editor-fold desc="Gestión de Reproducción">
+    /**
+     * Marca el onboarding como completado, guarda el estado y notifica a la UI.
+     */
+    fun setOnboardingComplete() {
+        appPreferences.saveOnboardingComplete(true)
+        _onboardingCompleted.value = true
+    }
     /**
      * Selecciona un episodio para reproducción. Si ya es el episodio actual, alterna play/pause.
      * @param episodio El [Episodio] a reproducir.
@@ -193,11 +224,60 @@ class MainViewModel(
         prepareEpisodePlayer(episodio, savedPosition, playWhenReady)
     }
 
+    /**
+     * Alterna la visibilidad del reproductor a pantalla completa.
+     */
+    fun toggleFullScreenPlayer() {
+        _isFullScreenPlayerVisible.value = !_isFullScreenPlayerVisible.value
+    }
+
+    /**
+     * Reproduce el siguiente episodio según la lógica de prioridad (cola > lista general).
+     */
+    fun playNextEpisode() {
+        val episode = _currentPlayingEpisode.value ?: return
+
+        val queue = queueViewModel.queueEpisodios.value
+        val indexInQueue = queue.indexOfFirst { it.id == episode.id }
+        if (indexInQueue != -1 && indexInQueue < queue.size - 1) {
+            selectEpisode(queue[indexInQueue + 1])
+            return
+        }
+
+        val programContextList = _contextualPlaylist.value
+        val indexInContextList = programContextList.indexOfFirst { it.id == episode.id }
+        if (indexInContextList != -1 && indexInContextList < programContextList.size - 1) {
+            selectEpisode(programContextList[indexInContextList + 1])
+        }
+    }
+
+    /**
+     * Reproduce el episodio anterior según la lógica de prioridad (cola > lista general).
+     */
+    fun playPreviousEpisode() {
+        val episode = _currentPlayingEpisode.value ?: return
+
+        val queue = queueViewModel.queueEpisodios.value
+        val indexInQueue = queue.indexOfFirst { it.id == episode.id }
+        if (indexInQueue != -1 && indexInQueue > 0) {
+            selectEpisode(queue[indexInQueue - 1])
+            return
+        }
+
+        val programContextList = _contextualPlaylist.value
+        val indexInContextList = programContextList.indexOfFirst { it.id == episode.id }
+        if (indexInContextList != -1 && indexInContextList > 0) {
+            selectEpisode(programContextList[indexInContextList - 1])
+        }
+    }
+
     /** Prepara el [podcastExoPlayer] para un episodio específico. */
     private fun prepareEpisodePlayer(episodio: Episodio, positionMs: Long, playWhenReady: Boolean) {
-        val mediaPath = downloadedViewModel.getDownloadedFilePathByEpisodeId(episodio.id) ?: episodio.archiveUrl
+        val mediaPath =
+            downloadedViewModel.getDownloadedFilePathByEpisodeId(episodio.id) ?: episodio.archiveUrl
         if (mediaPath == null) {
-            _initialDataError.value = "No se puede reproducir '${episodio.title}'. Falta URL del archivo."
+            _initialDataError.value =
+                "No se puede reproducir '${episodio.title}'. Falta URL del archivo."
             return
         }
         try {
@@ -209,6 +289,41 @@ class MainViewModel(
         } catch (e: Exception) {
             _initialDataError.value = "Error al preparar la reproducción de '${episodio.title}'."
         }
+    }
+
+    /**
+     * Comprueba y actualiza el estado de los botones de siguiente y anterior
+     * basándose en la posición del episodio actual en la cola o en la lista general.
+     */
+    private fun updateNextPreviousState() {
+        val episode = _currentPlayingEpisode.value ?: run {
+            _hasNextEpisode.value = false
+            _hasPreviousEpisode.value = false
+            return
+        }
+
+        // Prioridad 1: Comprobar la cola de reproducción
+        val queue = queueViewModel.queueEpisodios.value
+        val indexInQueue = queue.indexOfFirst { it.id == episode.id }
+
+        if (indexInQueue != -1) {
+            _hasPreviousEpisode.value = indexInQueue > 0
+            _hasNextEpisode.value = indexInQueue < queue.size - 1
+            return
+        }
+
+        // ---> CAMBIO: Prioridad 2: Usar la lista de contexto del programa
+        val programContextList = _contextualPlaylist.value
+        val indexInContextList = programContextList.indexOfFirst { it.id == episode.id }
+
+        if (indexInContextList != -1) {
+            _hasPreviousEpisode.value = indexInContextList > 0
+            _hasNextEpisode.value = indexInContextList < programContextList.size - 1
+            return
+        }
+
+        _hasNextEpisode.value = false
+        _hasPreviousEpisode.value = false
     }
 
     /** Gestiona el clic en el botón principal de play/pause del reproductor global. */
@@ -262,16 +377,54 @@ class MainViewModel(
         }
     }
 
-    /** Observa cambios en el episodio actual para gestionar la reproducción del stream. */
+    /**
+     * Observa cambios en el episodio actual para gestionar el estado y cargar
+     * la lista de contexto del programa si es necesario.
+     */
     private fun observeCurrentPlayingEpisode() {
         viewModelScope.launch {
             _currentPlayingEpisode.collect { episode ->
+                // Guardar el ID del episodio actual para restaurar estado
                 appPreferences.saveCurrentEpisodeId(episode?.id)
-                if (episode == null && _isAndainaStreamActive.value && !_hasStreamLoadFailed.value) {
-                    andainaStreamPlayer.play()
-                } else if (episode != null) {
+
+                if (episode != null) {
+                    // Si el episodio es nuevo, carga su contexto de programa
+                    val isNotInQueue = queueViewModel.queueEpisodios.value.none { it.id == episode.id }
+                    val isNotInCurrentContext = _contextualPlaylist.value.none { it.id == episode.id }
+
+                    if (isNotInQueue && isNotInCurrentContext) {
+                        // El episodio es nuevo y no viene de la cola ni del contexto actual
+                        // así que cargamos su contexto de programa.
+                        episode.programaIds?.firstOrNull()?.let { programaId ->
+                            try {
+                                // Cargamos los episodios del mismo programa
+                                val programEpisodes = episodioRepository.getEpisodiosPorPrograma(
+                                    programaId = programaId,
+                                    page = 1,
+                                    perPage = 100 // Límite razonable para la navegación
+                                )
+                                _contextualPlaylist.value = programEpisodes
+                            } catch (e: Exception) {
+                                // Si falla la carga, el contexto será la lista de episodios iniciales
+                                _contextualPlaylist.value = _initialEpisodios.value
+                            }
+                        } ?: run {
+                            // Si el episodio no tiene programaId, usamos la lista inicial como contexto
+                            _contextualPlaylist.value = _initialEpisodios.value
+                        }
+                    }
+                    // Si el episodio que se está reproduciendo es de streaming se detiene el stream
                     if (andainaStreamPlayer.isPlaying()) andainaStreamPlayer.stop()
+
+                } else {
+                    // Si no hay episodio, se limpia el contexto y se activa el stream si corresponde
+                    _contextualPlaylist.value = emptyList()
+                    if (_isAndainaStreamActive.value && !_hasStreamLoadFailed.value) {
+                        andainaStreamPlayer.play()
+                    }
                 }
+                // Siempre actualizamos el estado de los botones al cambiar de episodio
+                updateNextPreviousState()
             }
         }
     }
@@ -304,7 +457,10 @@ class MainViewModel(
             _isPodcastPlaying.value = isPlaying
             if (!isPlaying && podcastExoPlayer.playbackState != Player.STATE_ENDED && podcastExoPlayer.playbackState != Player.STATE_IDLE) {
                 _currentPlayingEpisode.value?.let { episodio ->
-                    appPreferences.saveEpisodePosition(episodio.id, podcastExoPlayer.currentPosition)
+                    appPreferences.saveEpisodePosition(
+                        episodio.id,
+                        podcastExoPlayer.currentPosition
+                    )
                     onGoingViewModel.addOrUpdateOnGoingEpisode(episodio)
                 }
             }
@@ -317,20 +473,33 @@ class MainViewModel(
                     onGoingViewModel.refrescarListaEpisodiosEnCurso()
                     viewModelScope.launch {
                         val nextEpisode = queueViewModel.dequeueNextEpisode(it.id)
-                        if (nextEpisode != null) selectEpisode(nextEpisode, true) else _currentPlayingEpisode.value = null
+                        if (nextEpisode != null) selectEpisode(
+                            nextEpisode,
+                            true
+                        ) else _currentPlayingEpisode.value = null
                     }
                 }
             }
         }
 
-        override fun onVolumeChanged(volume: Float) { if (_currentPlayingEpisode.value != null) _currentVolume.value = volume }
+        override fun onVolumeChanged(volume: Float) {
+            if (_currentPlayingEpisode.value != null) _currentVolume.value = volume
+        }
     }
 
     /** Crea y devuelve el listener para el reproductor del stream de Andaina. */
     private fun createAndainaPlayerListener(): Player.Listener = object : Player.Listener {
-        override fun onPlayerError(error: PlaybackException) { _hasStreamLoadFailed.value = true }
-        override fun onIsPlayingChanged(isPlaying: Boolean) { _isAndainaPlaying.value = isPlaying }
-        override fun onVolumeChanged(volume: Float) { if (_currentPlayingEpisode.value == null) _currentVolume.value = volume }
+        override fun onPlayerError(error: PlaybackException) {
+            _hasStreamLoadFailed.value = true
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            _isAndainaPlaying.value = isPlaying
+        }
+
+        override fun onVolumeChanged(volume: Float) {
+            if (_currentPlayingEpisode.value == null) _currentVolume.value = volume
+        }
     }
 
     /** Inicia un job para actualizar periódicamente el progreso de la UI del reproductor. */
@@ -342,8 +511,13 @@ class MainViewModel(
                     val duration = podcastExoPlayer.duration.takeIf { it > 0 } ?: 0L
                     val currentPos = podcastExoPlayer.currentPosition
                     _podcastDuration.value = duration
-                    _podcastProgress.value = if (duration > 0) currentPos.toFloat() / duration.toFloat() else 0f
-                    _currentPlayingEpisode.value?.let { onGoingViewModel.addOrUpdateOnGoingEpisode(it) }
+                    _podcastProgress.value =
+                        if (duration > 0) currentPos.toFloat() / duration.toFloat() else 0f
+                    _currentPlayingEpisode.value?.let {
+                        onGoingViewModel.addOrUpdateOnGoingEpisode(
+                            it
+                        )
+                    }
                 }
                 _isAndainaPlaying.value = andainaStreamPlayer.isPlaying()
                 delay(250)
@@ -368,6 +542,9 @@ class MainViewModel(
         }
     }
 
+    /**
+     * Cancela los jobs y listeners al destruir el ViewModel
+     */
     override fun onCleared() {
         super.onCleared()
         _currentPlayingEpisode.value?.let { episodio ->
@@ -382,5 +559,30 @@ class MainViewModel(
         andainaStreamPlayer.release()
         progressUpdateJob?.cancel()
         radioInfoUpdateJob?.cancel()
+    }
+
+    /**
+     * Salta hacia adelante en la reproducción del podcast actual.
+     *
+     * @param millis Milisegundos a adelantar (por defecto 30 segundos).
+     */
+    fun skipForward(millis: Long = 30000) {
+        if (_currentPlayingEpisode.value != null) {
+            val newPosition =
+                (podcastExoPlayer.currentPosition + millis).coerceAtMost(podcastExoPlayer.duration)
+            podcastExoPlayer.seekTo(newPosition)
+        }
+    }
+
+    /**
+     * Salta hacia atrás en la reproducción del podcast actual.
+     *
+     * @param millis Milisegundos a retroceder (por defecto 10 segundos).
+     */
+    fun rewind(millis: Long = 10000) {
+        if (_currentPlayingEpisode.value != null) {
+            val newPosition = (podcastExoPlayer.currentPosition - millis).coerceAtLeast(0)
+            podcastExoPlayer.seekTo(newPosition)
+        }
     }
 }
