@@ -2,10 +2,8 @@ package com.example.paradigmaapp.repository
 
 import com.example.paradigmaapp.api.ktorClient
 import com.example.paradigmaapp.cache.Database
-import com.example.paradigmaapp.cache.ProgramaEntity
 import com.example.paradigmaapp.cache.toDomain
 import com.example.paradigmaapp.cache.toEntity
-import com.example.paradigmaapp.cache.EpisodioEntity
 import com.example.paradigmaapp.exception.ApiException
 import com.example.paradigmaapp.exception.NoInternetException
 import com.example.paradigmaapp.exception.ServerErrorException
@@ -23,13 +21,11 @@ import io.ktor.utils.io.errors.IOException
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * Repositorio principal de la aplicación. Gestiona la obtención de datos
- * combinando una caché local (SQLDelight) y llamadas a la red (Ktor).
- * Actúa como la única fuente de verdad para los ViewModels, abstrayendo la complejidad
- * del origen de los datos.
+ * Repositorio principal que gestiona datos de programas y episodios.
+ * Combina una caché local (SQLDelight) y llamadas de red (Ktor) para
+ * proporcionar una experiencia de usuario rápida y offline-first.
  *
- * @param database La instancia de la base de datos local, inyectada para gestionar la caché.
- *
+ * @param database Instancia de la base de datos local para la gestión de la caché.
  * @author Mario Alguacil Juárez
  */
 class ParadigmaRepository(private val database: Database) : ProgramaRepository, EpisodioRepository {
@@ -38,18 +34,17 @@ class ParadigmaRepository(private val database: Database) : ProgramaRepository, 
     private val episodioQueries = database.episodioQueries
     private val baseUrl = "https://pruebas.paradigmamedia.org/wp-json/wp/v2"
 
+    // --- FUNCIONES DE PROGRAMA ---
+
     /**
-     * Obtiene la lista de programas usando una estrategia de "caché primero, luego red".
-     * 1. Devuelve inmediatamente los datos guardados en la base de datos local (caché).
-     * 2. Intenta actualizar la caché en segundo plano desde la red.
-     * 3. Si la red falla, la app sigue funcionando con los datos cacheados.
+     * Recupera una lista de todos los programas disponibles desde la fuente de datos.
      *
-     * @return Una lista de objetos [Programa].
+     * @return Una [List] de objetos [Programa].
      */
     override suspend fun getProgramas(): List<Programa> {
         val cachedProgramas = programaQueries.selectAllProgramas()
             .executeAsList()
-            .map { programaEntity: ProgramaEntity -> programaEntity.toDomain() }
+            .map { it.toDomain() }
 
         val networkProgramas = try {
             fetchProgramasFromNetwork()
@@ -70,21 +65,23 @@ class ParadigmaRepository(private val database: Database) : ProgramaRepository, 
                 )
             }
         }
-
         return networkProgramas
     }
 
     /**
-     * Obtiene los detalles de un programa específico, usando la caché.
-     * @param programaId El ID del [Programa] a recuperar.
+     * Recupera un único programa específico por su ID.
+     *
+     * @param programaId El ID del programa a recuperar.
      * @return El objeto [Programa] correspondiente o null si no se encuentra.
      */
     override suspend fun getPrograma(programaId: Int): Programa? {
-        return getProgramas().find { programa -> programa.id == programaId }
+        return getProgramas().find { it.id == programaId }
     }
 
     /**
-     * Función privada que solo se encarga de la llamada de red para obtener programas.
+     * Recupera la lista de programas desde la API de WordPress.
+     *
+     * @return Una [List] de objetos [Programa].
      */
     private suspend fun fetchProgramasFromNetwork(): List<Programa> {
         return ktorClient.get("$baseUrl/radio") {
@@ -92,9 +89,19 @@ class ParadigmaRepository(private val database: Database) : ProgramaRepository, 
         }.body()
     }
 
+    // --- FUNCIONES DE EPISODIO ---
+
     /**
-     * Obtiene los episodios de un programa usando una estrategia de "red primero, luego caché como fallback".
-     * @return Una lista de [Episodio].
+     * Recupera una lista paginada de episodios para un ID de programa específico.
+     *
+     * @param programaId El ID del programa para el cual se recuperarán los episodios.
+     * @param page El número de página para la paginación (por defecto es 1).
+     * @param perPage El número de episodios a recuperar por página (por defecto es 100).
+     * La API de WordPress puede tener un límite máximo para este valor (usualmente 100).
+     * @return Una [List] de objetos [Episodio].
+     * @throws NoInternetException Si no hay conexión a internet o la red falla.
+     * @throws ServerErrorException Si ocurre un error en el servidor durante la petición.
+     * @throws ApiException Para otros errores específicos de la API.
      */
     override suspend fun getEpisodiosPorPrograma(programaId: Int, page: Int, perPage: Int): List<Episodio> {
         try {
@@ -125,14 +132,12 @@ class ParadigmaRepository(private val database: Database) : ProgramaRepository, 
                     }
                 }
             }
-
             return networkEpisodios
-
         } catch (e: Exception) {
             val cachedEpisodios = episodioQueries
                 .selectEpisodiosByProgramaId(programaId.toLong())
                 .executeAsList()
-                .map { episodioEntity: EpisodioEntity -> episodioEntity.toDomain() }
+                .map { it.toDomain() }
 
             if (cachedEpisodios.isNotEmpty()) {
                 return cachedEpisodios
@@ -143,8 +148,15 @@ class ParadigmaRepository(private val database: Database) : ProgramaRepository, 
     }
 
     /**
-     * Obtiene una lista paginada de todos los episodios, típicamente los más recientes.
-     * Nota: Esta función actualmente no utiliza la caché local.
+     * Recupera una lista paginada de todos los episodios, típicamente los más recientes.
+     * Útil para una vista general de "últimos episodios".
+     *
+     * @param page El número de página para la paginación (por defecto es 1).
+     * @param perPage El número de episodios a recuperar por página (por defecto es 20).
+     * @return Una [List] de objetos [Episodio].
+     * @throws NoInternetException Si no hay conexión a internet o la red falla.
+     * @throws ServerErrorException Si ocurre un error en el servidor durante la petición.
+     * @throws ApiException Para otros errores específicos de la API.
      */
     override suspend fun getAllEpisodios(page: Int, perPage: Int): List<Episodio> {
         return safeApiCall("Error al obtener todos los episodios") {
@@ -158,10 +170,6 @@ class ParadigmaRepository(private val database: Database) : ProgramaRepository, 
         }
     }
 
-    /**
-     * Obtiene los detalles de un episodio específico por su ID.
-     * Nota: Esta función actualmente no utiliza la caché local.
-     */
     override suspend fun getEpisodio(episodioId: Int): Episodio? {
         return try {
             safeApiCall("Error al obtener el episodio $episodioId") {
@@ -178,24 +186,71 @@ class ParadigmaRepository(private val database: Database) : ProgramaRepository, 
         }
     }
 
+    // --- FUNCIONES DE BÚSQUEDA ---
+
     /**
-     * Busca episodios basándose en un término de búsqueda.
-     * Nota: Esta función actualmente no utiliza la caché local.
+     * Busca episodios en la caché local de forma síncrona.
+     * Esta función proporciona resultados inmediatos para mejorar la experiencia de usuario.
+     * Filtra los episodios cacheados cuyo título o contenido contengan el término de búsqueda.
+     *
+     * @param searchTerm El texto a buscar en la caché.
+     * @return Una lista de [Episodio] que coinciden con la búsqueda en la caché local.
+     */
+    fun buscarEpisodiosEnCache(searchTerm: String): List<Episodio> {
+        if (searchTerm.length < 3) return emptyList()
+
+        // La forma más eficiente sería con una consulta SQLDelight `LIKE`.
+        // Como alternativa robusta, filtramos en memoria los episodios ya cacheados.
+        return episodioQueries.selectAllEpisodios()
+            .executeAsList()
+            .filter {
+                it.title.contains(searchTerm, ignoreCase = true) ||
+                        it.content?.contains(searchTerm, ignoreCase = true) == true
+            }
+            .map { it.toDomain() }
+    }
+
+    /**
+     * Busca episodios en la red de forma optimizada.
+     * Utiliza el parámetro '_fields' de la API de WordPress para solicitar solo los
+     * datos necesarios para la vista de lista, excluyendo campos pesados como 'content'.
+     * Esto reduce drásticamente el tamaño de la respuesta y mejora la velocidad.
+     *
+     * @param searchTerm El texto a buscar en la red.
+     * @return Una lista de objetos [Episodio] con datos parciales pero suficientes para la lista.
      */
     override suspend fun buscarEpisodios(searchTerm: String): List<Episodio> {
         if (searchTerm.isBlank() || searchTerm.length <= 2) {
             return emptyList()
         }
+
+        // Definimos los campos que SÍ necesitamos para la lista de resultados.
+        // Excluimos deliberadamente 'content' y 'excerpt' por ser los más pesados.
+        val camposNecesarios = "id,date_gmt,slug,title,meta,url_del_podcast,radio,_links,_embedded"
+
         return safeApiCall("Error buscando episodios con término '$searchTerm'") {
             ktorClient.get("$baseUrl/posts") {
                 parameter("search", searchTerm)
                 parameter("per_page", 100)
+                // Pedimos a la API que solo nos devuelva los campos que hemos definido.
+                parameter("_fields", camposNecesarios)
+                // También pedimos que incruste la imagen destacada y los programas para no hacer más llamadas.
+                parameter("_embed", "wp:featuredmedia,wp:term")
             }.body()
         }
     }
 
+    // --- MANEJO DE ERRORES ---
+
     /**
-     * Envuelve las llamadas a la API con un manejo de errores común.
+     * Realiza una llamada a la API y maneja posibles errores.
+     *
+     * @param errorMessage Mensaje de error a mostrar en caso de excepción.
+     * @param apiCall Lambda que contiene la llamada a la API.
+     * @return El resultado de la llamada a la API.
+     * @throws NoInternetException Si no hay conexión a internet o la red falla.
+     * @throws ServerErrorException Si ocurre un error en el servidor durante la petición.
+     * @throws ApiException Para otros errores específicos de la API.
      */
     private suspend inline fun <T> safeApiCall(errorMessage: String, crossinline apiCall: suspend () -> T): T {
         try {

@@ -1,4 +1,4 @@
--- Define la tabla para los episodios
+-- Define la estructura de la tabla para los episodios en la base de datos local.
 CREATE TABLE EpisodioEntity (
     id INTEGER NOT NULL PRIMARY KEY,
     title TEXT NOT NULL,
@@ -7,19 +7,35 @@ CREATE TABLE EpisodioEntity (
     imageUrl TEXT,
     date TEXT NOT NULL,
     duration TEXT NOT NULL,
-    -- Columna para relacionar cada episodio con su programa
     programaId INTEGER NOT NULL
 );
 
--- Inserta o actualiza un episodio
+-- Inserta un nuevo episodio o reemplaza uno existente si el ID ya existe.
 insertEpisodio:
 INSERT OR REPLACE INTO EpisodioEntity(id, title, content, archiveUrl, imageUrl, date, duration, programaId)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+VALUES(?, ?, ?, ?, ?, ?, ?, ?);
 
--- Selecciona todos los episodios de un programa específico
+-- Selecciona todos los episodios guardados en la base de datos.
+selectAllEpisodios:
+SELECT *
+FROM EpisodioEntity;
+
+-- Selecciona todos los episodios que pertenecen a un programa específico.
 selectEpisodiosByProgramaId:
-SELECT * FROM EpisodioEntity WHERE programaId = ? ORDER BY date DESC;
+SELECT *
+FROM EpisodioEntity
+WHERE programaId = ?;
 
--- Borra todos los episodios de un programa específico. Útil para refrescar la caché.
+-- Elimina todos los episodios asociados a un ID de programa.
+-- Útil para refrescar la caché de un programa concreto.
 deleteEpisodiosByProgramaId:
-DELETE FROM EpisodioEntity WHERE programaId = ?;
+DELETE FROM EpisodioEntity
+WHERE programaId = ?;
+
+-- Busca episodios cuyo título o contenido contengan el término de búsqueda.
+-- La sintaxis 'LIKE '%' || :searchTerm || '%'' busca cualquier coincidencia parcial.
+-- Esta es la consulta que hará que nuestra búsqueda en caché sea súper rápida y eficiente.
+buscarPorTitulo:
+SELECT *
+FROM EpisodioEntity
+WHERE title LIKE '%' || :searchTerm || '%' OR content LIKE '%' || :searchTerm || '%';

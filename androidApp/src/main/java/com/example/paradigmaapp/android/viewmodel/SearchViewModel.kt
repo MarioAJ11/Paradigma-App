@@ -2,10 +2,9 @@ package com.example.paradigmaapp.android.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.paradigmaapp.exception.ApiException
 import com.example.paradigmaapp.exception.NoInternetException
-import com.example.paradigmaapp.exception.ServerErrorException
 import com.example.paradigmaapp.model.Episodio
+import com.example.paradigmaapp.repository.ParadigmaRepository
 import com.example.paradigmaapp.repository.contracts.EpisodioRepository
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -20,32 +19,31 @@ import kotlinx.coroutines.launch
 
 /**
  * ViewModel para la pantalla de búsqueda de episodios.
- * Gestiona el estado del texto de búsqueda, los resultados, el estado de carga
- * y los posibles errores. La búsqueda se activa cuando el usuario introduce al menos 3 caracteres,
- * con un debounce para evitar peticiones excesivas a la API.
+ * Implementa una estrategia de búsqueda híbrida para una experiencia de usuario óptima:
+ * 1.  **Búsqueda local instantánea**: Ofrece resultados inmediatos desde la caché.
+ * 2.  **Búsqueda en red**: Complementa los resultados con una búsqueda completa en el servidor.
  *
- * @property episodioRepository Repositorio para realizar la búsqueda de episodios.
- *
+ * @property episodioRepository Repositorio para buscar episodios. Debe ser una instancia de [ParadigmaRepository].
  * @author Mario Alguacil Juárez
  */
-@OptIn(FlowPreview::class) // Necesario para el operador debounce
+@OptIn(FlowPreview::class)
 class SearchViewModel(
     private val episodioRepository: EpisodioRepository
 ) : ViewModel() {
 
-    // StateFlow para el texto actual introducido por el usuario en la barra de búsqueda.
+    // Flujo para el texto de búsqueda introducido por el usuario.
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
 
-    // StateFlow para la lista de episodios que coinciden con la búsqueda.
+    // Flujo para la lista de episodios que coinciden con la búsqueda.
     private val _searchResults = MutableStateFlow<List<Episodio>>(emptyList())
     val searchResults: StateFlow<List<Episodio>> = _searchResults.asStateFlow()
 
-    // StateFlow para indicar si una búsqueda está actualmente en progreso.
+    // Flujo para indicar si una búsqueda está en progreso.
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
-    // StateFlow para el mensaje de error si la búsqueda falla o no produce resultados.
+    // Flujo para cualquier mensaje de error.
     private val _searchError = MutableStateFlow<String?>(null)
     val searchError: StateFlow<String?> = _searchError.asStateFlow()
 
@@ -57,92 +55,91 @@ class SearchViewModel(
     }
 
     init {
+        // Observa los cambios en el texto para lanzar la búsqueda automáticamente.
         observeSearchTextChanges()
     }
 
-    /** Observa los cambios en el texto de búsqueda para iniciar automáticamente la búsqueda. */
+    /** Observa los cambios en el texto de búsqueda con un debounce. */
     private fun observeSearchTextChanges() {
         viewModelScope.launch {
             _searchText
-                .debounce(SEARCH_DEBOUNCE_MS) // Espera a que el usuario deje de escribir
-                .filter { query -> // Solo procesar si la query es suficientemente larga o está vacía (para limpiar)
-                    query.length >= MIN_QUERY_LENGTH || query.isEmpty()
-                }
-                .distinctUntilChanged() // Evita búsquedas repetidas con el mismo texto
-                .collectLatest { query -> // Cancela la búsqueda anterior si llega una nueva query
+                .debounce(SEARCH_DEBOUNCE_MS)
+                .filter { query -> query.length >= MIN_QUERY_LENGTH || query.isEmpty() }
+                .distinctUntilChanged()
+                .collectLatest { query ->
                     if (query.length >= MIN_QUERY_LENGTH) {
                         performSearch(query)
                     } else {
-                        // Query corta o vacía, limpiar resultados y estado.
+                        // Limpia los resultados si la consulta es muy corta o está vacía.
                         _searchResults.value = emptyList()
                         _isSearching.value = false
-                        _searchError.value = null // Limpiar errores si la query se borra o es muy corta
+                        _searchError.value = null
                         searchJob?.cancel()
                     }
                 }
         }
     }
 
-    /**
-     * Se invoca cuando el texto en la UI de búsqueda cambia. Actualiza el [searchText].
-     * @param query El nuevo texto de búsqueda.
-     */
+    /** Actualiza el texto de búsqueda desde la UI. */
     fun onSearchTextChanged(query: String) {
         _searchText.value = query
     }
 
-    /** Realiza la búsqueda de episodios utilizando el [episodioRepository]. */
+    /**
+     * Realiza la búsqueda híbrida. Primero consulta la caché local para resultados
+     * instantáneos y luego busca en la red para obtener una lista completa.
+     *
+     * @param query El término de búsqueda.
+     */
     private fun performSearch(query: String) {
-        searchJob?.cancel() // Cancelar cualquier búsqueda anterior.
+        searchJob?.cancel()
         searchJob = viewModelScope.launch {
             _isSearching.value = true
-            _searchError.value = null // Limpiar errores al iniciar una nueva búsqueda.
-            _searchResults.value = emptyList() // Limpiar resultados anteriores.
+            _searchError.value = null
 
+            // 1. Búsqueda local para resultados instantáneos.
+            val localResults = (episodioRepository as? ParadigmaRepository)
+                ?.buscarEpisodiosEnCache(query) ?: emptyList()
+            _searchResults.value = localResults
+
+            // 2. Búsqueda en red para resultados completos.
             try {
-                // La API de WordPress ya filtra por término de búsqueda en múltiples campos.
-                // El filtrado adicional por título en el cliente se puede mantener si se desea
-                // una relevancia específica en el título, pero puede ocultar resultados válidos.
-                val serverResults = episodioRepository.buscarEpisodios(query) //
+                val networkResults = episodioRepository.buscarEpisodios(query)
 
-                // Opcional: Filtrar adicionalmente por título en el cliente.
-                // val filteredByTitleResults = serverResults.filter { episodio ->
-                // episodio.title.contains(query, ignoreCase = true)
-                // }
+                // Combina resultados locales y de red, eliminando duplicados.
+                val combinedResults = (localResults + networkResults).distinctBy { it.id }
 
-                if (serverResults.isNotEmpty()) {
-                    _searchResults.value = serverResults
+                if (combinedResults.isNotEmpty()) {
+                    _searchResults.value = combinedResults
                 } else {
                     _searchResults.value = emptyList()
                     _searchError.value = "No se encontraron episodios para \"$query\"."
                 }
 
             } catch (e: NoInternetException) {
-                _searchError.value = e.message ?: "Sin conexión a internet."
-                _searchResults.value = emptyList()
-            } catch (e: ServerErrorException) {
-                _searchError.value = e.userFriendlyMessage
-                _searchResults.value = emptyList()
-            } catch (e: ApiException) {
-                _searchError.value = e.message ?: "Error de API durante la búsqueda."
-                _searchResults.value = emptyList()
+                // Si no hay internet, nos quedamos con los resultados locales y mostramos un mensaje.
+                val errorMessage = if (localResults.isEmpty()) {
+                    e.message ?: "Sin conexión a internet."
+                } else {
+                    "Mostrando resultados locales. Se requiere conexión para una búsqueda completa."
+                }
+                _searchError.value = errorMessage
             } catch (e: Exception) {
+                // Manejo de otros errores de red o del servidor.
                 _searchError.value = "Ocurrió un error al realizar la búsqueda."
-                _searchResults.value = emptyList()
-                // Considerar registrar `e` en un sistema de monitoreo.
+                if (localResults.isEmpty()) _searchResults.value = emptyList()
             } finally {
                 _isSearching.value = false
             }
         }
     }
 
-    /** Limpia el texto de búsqueda actual y, consecuentemente, los resultados. */
+    /** Limpia el texto de búsqueda y los resultados. */
     fun clearSearch() {
         _searchText.value = ""
-        // El colector de _searchText se encargará de limpiar el resto.
     }
 
-    /** Permite reintentar la última búsqueda realizada si falló anteriormente. */
+    /** Permite reintentar la última búsqueda realizada. */
     fun retrySearch() {
         val currentQuery = _searchText.value
         if (currentQuery.length >= MIN_QUERY_LENGTH) {
@@ -152,6 +149,6 @@ class SearchViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        searchJob?.cancel() // Asegurar que el job se cancela si el ViewModel se destruye.
+        searchJob?.cancel()
     }
 }
