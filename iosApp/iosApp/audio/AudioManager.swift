@@ -3,18 +3,13 @@ import AVFoundation
 import shared
 import Combine
 
-/**
- * El tipo de contenido que el reproductor puede manejar.
- */
+// (El enum PlayerContent se mantiene igual)
 enum PlayerContent: Equatable {
     case episodio(Episodio)
     case liveStream
 }
 
-/**
- * Gestiona la reproducción de audio de toda la aplicación.
- * Es capaz de reproducir archivos locales si están descargados, o de hacer streaming.
- */
+
 @MainActor
 class AudioManager: NSObject, ObservableObject {
 
@@ -28,9 +23,13 @@ class AudioManager: NSObject, ObservableObject {
         if case .episodio(let episodio) = content { return episodio }
         return nil
     }
+
     @Published var isPlaying: Bool = false
     @Published var progress: Double = 0.0
     @Published var duration: Double = 0.0
+
+    /// NUEVO: Controla la visibilidad del reproductor a pantalla completa.
+    @Published var isFullScreenPlayerVisible: Bool = false
 
     // MARK: - Propiedades Privadas
 
@@ -46,6 +45,11 @@ class AudioManager: NSObject, ObservableObject {
 
     // MARK: - Controles Públicos
 
+    /// Muestra u oculta el reproductor a pantalla completa.
+    func toggleFullScreenPlayer() {
+        isFullScreenPlayerVisible.toggle()
+    }
+
     func selectEpisode(_ episodio: Episodio) {
         if let current = currentEpisode, current.id == episodio.id {
             togglePlayPause()
@@ -55,11 +59,16 @@ class AudioManager: NSObject, ObservableObject {
         var urlToPlay: URL?
         if let localURL = localFilePath(for: episodio), FileManager.default.fileExists(atPath: localURL.path) {
             urlToPlay = localURL
+            print("Reproduciendo desde archivo local: \(localURL.path)")
         } else if let remoteURLString = episodio.archiveUrl {
             urlToPlay = URL(string: remoteURLString)
+            print("Reproduciendo desde URL remota: \(remoteURLString)")
         }
 
-        guard let finalURL = urlToPlay else { return }
+        guard let finalURL = urlToPlay else {
+            print("Error: No se encontró URL válida para el episodio \(episodio.id)")
+            return
+        }
 
         self.content = .episodio(episodio)
         preparePlayer(with: finalURL)
@@ -79,19 +88,9 @@ class AudioManager: NSObject, ObservableObject {
         play()
     }
 
-    func play() {
-        player?.play()
-        isPlaying = true
-    }
-
-    func pause() {
-        player?.pause()
-        isPlaying = false
-    }
-
-    func togglePlayPause() {
-        isPlaying ? pause() : play()
-    }
+    func play() { player?.play(); isPlaying = true }
+    func pause() { player?.pause(); isPlaying = false }
+    func togglePlayPause() { isPlaying ? pause() : play() }
 
     func seek(to progress: Double) {
         guard case .episodio = content else { return }
@@ -99,12 +98,25 @@ class AudioManager: NSObject, ObservableObject {
         player?.seek(to: targetTime)
     }
 
+    /// Avanza la reproducción un número determinado de segundos.
+    func skipForward(_ seconds: Double = 30.0) {
+        guard case .episodio = content, let currentTime = player?.currentTime() else { return }
+        let newTime = CMTimeAdd(currentTime, CMTime(seconds: seconds, preferredTimescale: 600))
+        player?.seek(to: newTime)
+    }
+
+    /// Retrocede la reproducción un número determinado de segundos.
+    func rewind(_ seconds: Double = 10.0) {
+        guard case .episodio = content, let currentTime = player?.currentTime() else { return }
+        let newTime = CMTimeSubtract(currentTime, CMTime(seconds: seconds, preferredTimescale: 600))
+        player?.seek(to: newTime)
+    }
+
     func isBuffering(episodeId: KotlinInt) -> Bool {
         return self.currentEpisode?.id == episodeId && !self.isPlaying && self.progress == 0.0
     }
 
-    // MARK: - Lógica Interna
-
+    // El resto de la clase (Lógica Interna, observers, etc.) se mantiene sin cambios...
     private func setupAudioSession() {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
@@ -124,38 +136,28 @@ class AudioManager: NSObject, ObservableObject {
         addObservers(for: playerItem)
     }
 
-    /// Añade los observadores necesarios a un AVPlayerItem para actualizar la UI.
     private func addObservers(for playerItem: AVPlayerItem) {
-        // Observador de estado
         statusObserver = playerItem.observe(\.status, options: .initial) { [weak self] item, _ in
             if item.status == .readyToPlay {
                 self?.duration = item.duration.seconds
             }
         }
 
-        // Observador de tiempo
         removePeriodicTimeObserver()
-        let interval = CMTime(seconds: 0.5, preferredTimescale: 1_000_000_000)
-        let mainQueue = DispatchQueue.main
-
-        // Definimos el bloque de código por separado.
-        let observerBlock = { [weak self] (time: CMTime) -> Void in
-            guard let self = self else { return }
-
-            let hasValidDuration = self.duration.isFinite && self.duration > 0
-            if hasValidDuration {
-                self.progress = time.seconds / self.duration
+        let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        timeObserverToken = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            guard let self = self, let player = self.player, player.currentItem?.status == .readyToPlay else { return }
+            let duration = self.duration
+            if duration.isFinite && duration > 0 {
+                self.progress = time.seconds / duration
             }
         }
 
-        // Añadimos el observador usando todos los parámetros explícitamente.
-        self.timeObserverToken = self.player?.addPeriodicTimeObserver(forInterval: interval, queue: mainQueue, using: observerBlock)
-
-        // Observador de fin de reproducción
         NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime, object: playerItem)
             .sink { [weak self] _ in
                 self?.isPlaying = false
                 self?.progress = 1.0
+                // Aquí iría la lógica para pasar al siguiente episodio de la cola.
             }
             .store(in: &cancellables)
     }

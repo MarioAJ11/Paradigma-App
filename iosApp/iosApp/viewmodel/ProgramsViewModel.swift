@@ -1,114 +1,62 @@
 import Foundation
-import shared // Importamos el módulo compartido de Kotlin
+import shared
 
 /**
- * ViewModel para la pantalla que muestra los detalles de un programa y su lista de episodios.
+ * ViewModel para la pantalla principal (`HomeScreen`).
  *
  * Se encarga de:
- * - Recibir el ID de un programa.
- * - Cargar los detalles de ese programa (nombre, imagen, etc.).
- * - Cargar la lista de sus episodios de forma paginada (infite scroll).
- * - Publicar los datos y los estados de carga/error para que la vista de SwiftUI los muestre.
+ * - Cargar la lista completa de programas desde el `ParadigmaSDK`.
+ * - Publicar la lista de programas para que la vista `HomeScreen` la muestre.
+ * - Gestionar los estados de carga y error durante la obtención de los datos.
  */
-@MainActor // Asegura que los cambios a las propiedades @Published se hagan en el hilo principal.
-class ProgramaViewModel: ObservableObject {
+@MainActor
+class ProgramsViewModel: ObservableObject {
 
     // MARK: - Propiedades Publicadas
 
-    /// Los detalles del programa que se está mostrando. `null` inicialmente.
-    @Published var programa: Programa? = nil
+    /// La lista de programas que se mostrará en la cuadrícula principal.
+    @Published var programs: [Programa] = []
 
-    /// La lista de episodios cargados para este programa.
-    @Published var episodios: [Episodio] = []
-
-    /// Indica si se está realizando una carga de datos (inicial o paginada).
+    /// Indica si se está realizando la carga inicial de datos.
     @Published var isLoading = false
 
-    /// Contiene un mensaje de error si alguna operación falla.
+    /// Contiene un mensaje de error si la carga falla.
     @Published var errorMessage: String? = nil
 
     // MARK: - Propiedades Privadas
 
-    private let sdk = ParadigmaSDK()
-
-    /// El ID del programa que este ViewModel está gestionando.
-    private let programaId: Int
-
-    /// El estado de la paginación.
-    private var currentPage = 1
-    private var canLoadMore = true
-    private var isLoadingMore = false
+    private let sdk: ParadigmaSDK
 
     // MARK: - Inicializador
 
-    init(programaId: Int) {
-        self.programaId = programaId
+    init() {
+        // Inicializamos el SDK con su repositorio, creando las dependencias de la base de datos.
+        let databaseDriverFactory = DatabaseDriverFactory()
+        let database = Database(databaseDriverFactory: databaseDriverFactory)
+        let repository = ParadigmaRepository(database: database)
+        self.sdk = ParadigmaSDK(repository: repository)
     }
+
 
     // MARK: - Métodos Públicos
 
-    /// Carga los datos iniciales: los detalles del programa y la primera página de episodios.
-    func loadInitialData() async {
-        // Solo ejecuta la carga inicial si aún no se ha hecho.
-        guard self.programa == nil else { return }
+    /// Carga la lista completa de programas desde el SDK.
+    func loadPrograms() async {
+        // Evita recargar si ya hay programas cargados.
+        // Para forzar una recarga, se podría añadir un parámetro `forceReload: Bool = false`.
+        guard programs.isEmpty else { return }
 
-        self.isLoading = true
-        self.errorMessage = nil
-
-        do {
-            // Carga los detalles del programa para la cabecera.
-            self.programa = try await asyncResult(for: sdk.getPrograma(programaId: Int32(programaId)))
-
-            // Carga la primera página de episodios.
-            let firstPageEpisodios = try await fetchEpisodios(page: 1)
-            self.episodios = firstPageEpisodios
-
-        } catch {
-            // Si algo falla, guardamos el mensaje de error.
-            self.errorMessage = "Error al cargar el programa: \(error.localizedDescription)"
-        }
-
-        self.isLoading = false
-    }
-
-    /// Carga la siguiente página de episodios.
-    /// La vista llamará a esta función cuando el usuario llegue al final de la lista.
-    func loadMoreEpisodios() async {
-        // Evita cargas múltiples si ya hay una en curso o si no hay más páginas.
-        guard canLoadMore, !isLoadingMore else { return }
-
-        self.isLoadingMore = true
+        isLoading = true
+        errorMessage = nil
 
         do {
-            let newEpisodios = try await fetchEpisodios(page: self.currentPage)
-
-            // Añade los nuevos episodios a la lista existente.
-            self.episodios.append(contentsOf: newEpisodios)
-
+            // Llama a la función del SDK para obtener los programas y los publica.
+            programs = try await asyncResult(for: sdk.getProgramas())
         } catch {
-            // En caso de error, simplemente dejamos de cargar más.
-            // No mostramos un error para no interrumpir la vista de los ya cargados.
-            self.canLoadMore = false
+            // Si ocurre un error, se guarda el mensaje para mostrarlo en la UI.
+            errorMessage = "No se pudieron cargar los programas. Revisa tu conexión. (\(error.localizedDescription))"
         }
 
-        self.isLoadingMore = false
-    }
-
-    // MARK: - Métodos Privados
-
-    /// Función auxiliar para obtener episodios de una página específica desde el SDK.
-    private func fetchEpisodios(page: Int) async throws -> [Episodio] {
-        let fetchedEpisodios = try await asyncResult(for: sdk.getEpisodiosPorPrograma(programaId: Int32(programaId), page: Int32(page)))
-
-        // Si la API devuelve menos episodios de los que pedimos (o 0),
-        // asumimos que hemos llegado al final.
-        if fetchedEpisodios.count < 20 {
-            self.canLoadMore = false
-        }
-
-        // Incrementamos el contador para la próxima llamada.
-        self.currentPage += 1
-
-        return fetchedEpisodios
+        isLoading = false
     }
 }

@@ -12,23 +12,43 @@ extension String {
     func unescaped() -> String {
         var newString = self
         let entities = [
-            "&amp;": "&",
-            "&lt;": "<",
-            "&gt;": ">",
-            "&quot;": "\"",
-            "&#039;": "'",
-            "&apos;": "'",
-            "&#8217;": "’",
-            "&#8211;": "–",
-            "&#8230;": "…",
-            "&#8220;": "“",
-            "&#8221;": "”",
-            "&nbsp;": " "
+            "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#039;": "'",
+            "&apos;": "'", "&#8217;": "’", "&#8211;": "–", "&#8212;": "—",
+            "&#8230;": "…", "&#8220;": "“", "&#8221;": "”", "&#171;": "«",
+            "&#187;": "»", "&nbsp;": " "
         ]
 
         for (key, value) in entities {
-            newString = newString.replacingOccurrences(of: key, with: value)
+            newString = newString.replacingOccurrences(of: key, with: value, options: .caseInsensitive)
         }
         return newString
+    }
+
+    /**
+     * Elimina todas las etiquetas HTML de una cadena de texto.
+     * - Returns: Una nueva `String` sin etiquetas HTML y con espacios en blanco extra eliminados.
+     */
+    func stripHtmlTags() -> String {
+        return self.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression, range: nil).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /**
+     * Extrae una descripción significativa y limpia de una cadena que puede contener HTML.
+     * Intenta extraer el contenido del primer párrafo `<p>`. Si no lo encuentra, limpia todo el HTML.
+     * - Returns: Una `String` limpia y formateada.
+     */
+    func extractMeaningfulDescription() -> String {
+        let decodedHtml = self.unescaped()
+
+        let firstParagraphRegex = try! NSRegularExpression(pattern: "<p[^>]*>(.*?)</p>", options: [.caseInsensitive, .dotMatchesLineSeparators])
+
+        if let match = firstParagraphRegex.firstMatch(in: decodedHtml, options: [], range: NSRange(location: 0, length: decodedHtml.utf16.count)) {
+            if let range = Range(match.range(at: 1), in: decodedHtml) {
+                return String(decodedHtml[range]).stripHtmlTags()
+            }
+        }
+
+        // Si no hay párrafos, limpia todo el string
+        return decodedHtml.stripHtmlTags()
     }
 }

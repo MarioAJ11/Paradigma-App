@@ -4,9 +4,8 @@ import SwiftUI
  * Punto de entrada principal de la aplicación de iOS.
  *
  * Responsabilidades:
- * - Inicializar los gestores y ViewModels globales (`SettingsViewModel`, `AudioManager`, etc.).
- * - Inyectar los objetos globales en el entorno de SwiftUI para que estén disponibles en toda la app.
- * - Aplicar el tema (claro/oscuro/sistema) a la vista raíz.
+ * - Decidir si mostrar la pantalla de Onboarding o la aplicación principal.
+ * - Inicializar y proveer los gestores y ViewModels globales al entorno de SwiftUI.
  */
 @main
 struct iOSApp: App {
@@ -19,16 +18,25 @@ struct iOSApp: App {
     @StateObject private var downloadedViewModel = DownloadedViewModel()
     @StateObject private var onGoingViewModel = OnGoingViewModel()
 
-	var body: some Scene {
-		WindowGroup {
-			ContentView()
-                .preferredColorScheme(getPreferredColorScheme())
-                .environmentObject(audioManager)
-                .environmentObject(queueViewModel)
-                .environmentObject(downloadedViewModel)
-                .environmentObject(onGoingViewModel)
-		}
-	}
+    var body: some Scene {
+        WindowGroup {
+            // Se comprueba el estado `hasCompletedOnboarding` del ViewModel.
+            if settingsViewModel.hasCompletedOnboarding {
+                // Si ya se completó, muestra la app principal.
+                ContentView()
+                    .preferredColorScheme(getPreferredColorScheme())
+                    .environmentObject(settingsViewModel) // Inyectamos también settings
+                    .environmentObject(audioManager)
+                    .environmentObject(queueViewModel)
+                    .environmentObject(downloadedViewModel)
+                    .environmentObject(onGoingViewModel)
+            } else {
+                // Si no se ha completado, muestra la pantalla de bienvenida.
+                OnboardingView()
+                    .environmentObject(settingsViewModel) // La vista de onboarding necesita el ViewModel
+            }
+        }
+    }
 
     /// Determina el esquema de color a aplicar basándose en la preferencia guardada.
     private func getPreferredColorScheme() -> ColorScheme? {
@@ -36,7 +44,6 @@ struct iOSApp: App {
         case .light:
             return .light
         case .dark:
-            g_button
             return .dark
         case .system:
             return nil

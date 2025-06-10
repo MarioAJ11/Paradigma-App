@@ -2,47 +2,51 @@ import SwiftUI
 
 /**
  * Vista que presenta la pantalla de Ajustes de la aplicación.
- * Permite al usuario configurar preferencias como el tema y el comportamiento de inicio.
- * Se comunica con `SettingsViewModel` para leer y escribir estas preferencias.
+ * Permite al usuario configurar preferencias y consultar una guía de uso.
  */
 struct SettingsView: View {
 
-    // Usamos @StateObject para crear y mantener viva una instancia del ViewModel
-    // mientras esta vista esté activa.
     @StateObject private var viewModel = SettingsViewModel()
-
-    // Obtenemos una referencia al manejador de URLs para abrir enlaces externos.
     @Environment(\.openURL) var openURL
 
     var body: some View {
-        // NavigationView proporciona la barra de título superior y la capacidad de navegación.
         NavigationView {
-            // Form es el contenedor estándar en iOS para pantallas de ajustes.
-            // Agrupa visualmente los elementos.
             Form {
-                // MARK: - Sección de Preferencias
+                // --- Sección de Preferencias ---
                 Section(header: Text("Preferencias Generales")) {
-                    // El Toggle se vincula directamente a la propiedad @AppStorage del ViewModel.
-                    // Cualquier cambio en el interruptor actualiza la preferencia guardada.
                     Toggle("Abrir con Radio en Directo", isOn: $viewModel.isStreamActiveOnLaunch)
                 }
 
-                // MARK: - Sección de Apariencia
+                // --- Sección de Apariencia ---
                 Section(header: Text("Apariencia")) {
-                    // El Picker permite al usuario elegir una opción de una lista.
-                    // Se vincula a la propiedad `themePreference` de nuestro ViewModel.
                     Picker("Tema de la Aplicación", selection: $viewModel.themePreference) {
-                        // Iteramos sobre todas las opciones de nuestro enum `ThemePreference`.
                         ForEach(ThemePreference.allCases) { theme in
                             Text(theme.rawValue).tag(theme)
                         }
                     }
-                    // .pickerStyle(.navigationLink) es un estilo común en iOS para selectores.
                 }
 
-                // MARK: - Sección de Información
+                // --- NUEVO: Guía de Usuario ---
+                Section(header: Text("Ayuda y Funcionalidades")) {
+                    HelpItemView(icon: "hand.tap.fill", title: "Ver Detalles del Episodio", description: "Mantén pulsado cualquier episodio en una lista para ver su pantalla de detalles completa.")
+                    HelpItemView(icon: "arrow.up.left.and.arrow.down.right.circle.fill", title: "Reproductor Ampliado", description: "Pulsa sobre la información del episodio en el reproductor inferior para abrir la vista a pantalla completa.")
+                }
+
+                Section(header: Text("Controles del Reproductor")) {
+                    HelpItemView(icon: "play.circle.fill", title: "Reproducir / Pausar", description: "El botón central grande inicia o detiene la reproducción.")
+                    HelpItemView(icon: "speaker.wave.2.fill", title: "Radio en Directo", description: "El botón de la antena activa o desactiva la radio en directo.")
+                }
+
+                Section(header: Text("Menú de Navegación")) {
+                    HelpItemView(icon: "house.fill", title: "Inicio", description: "Vuelve a la pantalla principal con la lista de programas.")
+                    HelpItemView(icon: "magnifyingglass", title: "Buscar", description: "Encuentra cualquier episodio por título o descripción.")
+                    HelpItemView(icon: "hourglass", title: "Continuar", description: "Episodios que has empezado a escuchar pero no has terminado.")
+                    HelpItemView(icon: "arrow.down.circle.fill", title: "Descargas", description: "Accede a los episodios guardados para escucharlos sin conexión.")
+                    HelpItemView(icon: "list.bullet", title: "Cola", description: "Organiza una lista de reproducción personalizada.")
+                }
+
+                // --- Sección de Información ---
                 Section(header: Text("Más Información")) {
-                    // Botón que abre el navegador web del sistema.
                     Button("Visitar web de Paradigma Media") {
                         if let url = URL(string: "https://paradigmamedia.org/") {
                             openURL(url)
@@ -50,7 +54,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Ajustes") // Título que aparece en la barra de navegación.
+            .navigationTitle("Ajustes")
         }
     }
 }
