@@ -17,9 +17,18 @@ struct iOSApp: App {
     @StateObject private var queueViewModel = QueueViewModel()
     @StateObject private var downloadedViewModel = DownloadedViewModel()
     @StateObject private var onGoingViewModel = OnGoingViewModel()
+    /**
+     * El inicializador de la App es el lugar perfecto para configurar
+     * los servicios que deben vivir durante todo el ciclo de vida de la app.
+     */
+    init() {
+        // Inicia nuestro gestor de servicios, que a su vez
+        // comenzará a descargar la configuración remota en segundo plano.
+        AppServices.shared.initialize()
+    }
 
-    var body: some Scene {
-        WindowGroup {
+	var body: some Scene {
+		WindowGroup {
             // Se comprueba el estado `hasCompletedOnboarding` del ViewModel.
             if settingsViewModel.hasCompletedOnboarding {
                 // Si ya se completó, muestra la app principal.

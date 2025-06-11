@@ -17,7 +17,7 @@ class DownloadedViewModel: ObservableObject {
     // Referencia al gestor de descargas y a sus eventos.
     private let downloadManager = DownloadManager.shared
     private var cancellables = Set<AnyCancellable>()
-
+    private let sdk = AppServices.shared.sdk
     private let userDefaultsKey = "downloaded_episodes_list"
 
     init() {

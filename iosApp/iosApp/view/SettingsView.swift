@@ -47,14 +47,16 @@ struct SettingsView: View {
 
                 // --- Sección de Información ---
                 Section(header: Text("Más Información")) {
-                    Button("Visitar web de Paradigma Media") {
-                        if let url = URL(string: "https://paradigmamedia.org/") {
-                            openURL(url)
+                                    Button("Visitar web de Paradigma Media") {
+                                        // Obtiene la URL de la web desde la configuración remota.
+                                        let urlString = AppServices.shared.getConfig().mainWebsiteUrl
+                                        if let url = URL(string: urlString) {
+                                            openURL(url)
+                                        }
+                                    }
+                                }
+                            }
+                            .navigationTitle("Ajustes")
                         }
                     }
                 }
-            }
-            .navigationTitle("Ajustes")
-        }
-    }
-}

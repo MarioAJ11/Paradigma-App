@@ -13,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
@@ -49,13 +48,10 @@ import com.example.paradigmaapp.android.viewmodel.SettingsViewModel
 
 /**
  * Pantalla de Ajustes de la aplicación.
- * Permite al usuario configurar opciones como el tema de la aplicación (claro/oscuro/sistema),
- * la preferencia de inicio con radio en directo y acceder a enlaces externos.
+ * Permite al usuario configurar la app y acceder a una guía de ayuda.
  *
- * @param settingsViewModel El [SettingsViewModel] que gestiona el estado y la lógica de los ajustes.
- * @param onBackClick Lambda que se invoca cuando el usuario pulsa el botón de retroceso en la TopAppBar.
- *
- * @author Mario Alguacil Juárez
+ * @param settingsViewModel El ViewModel que gestiona el estado de los ajustes.
+ * @param onBackClick Lambda para manejar la acción de retroceso.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,11 +62,12 @@ fun SettingsScreen(
     val uriHandler = LocalUriHandler.current
     val isStreamActive by settingsViewModel.isStreamActive.collectAsState()
     val isManuallySetToDarkTheme by settingsViewModel.isManuallySetToDarkTheme.collectAsState()
+    val websiteUrl = settingsViewModel.mainWebsiteUrl
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ajustes") },
+                title = { Text("Ajustes y Ayuda") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -116,7 +113,10 @@ fun SettingsScreen(
                 onClick = { settingsViewModel.setThemePreference(null) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = if (isManuallySetToDarkTheme == null) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) else ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                colors = if (isManuallySetToDarkTheme == null) ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) else ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                 border = if (isManuallySetToDarkTheme != null) ButtonDefaults.outlinedButtonBorder else null
             ) {
                 Text("Seguir tema del sistema")
@@ -163,25 +163,33 @@ fun SettingsScreen(
             HelpItem(
                 icon = Icons.Default.Search,
                 title = "Buscar",
-                description = "Encuentra cualquier episodio por título o descripción.")
+                description = "Encuentra cualquier episodio por título o descripción."
+            )
             HelpItem(
                 icon = Icons.Default.History,
                 title = "Continuar",
-                description = "Aquí aparecen los episodios que has empezado a escuchar pero no has terminado.")
+                description = "Aquí aparecen los episodios que has empezado a escuchar pero no has terminado."
+            )
             HelpItem(
                 icon = Icons.Default.Download,
                 title = "Descargas",
-                description = "Accede a los episodios guardados para escucharlos sin conexión.")
+                description = "Accede a los episodios guardados para escucharlos sin conexión."
+            )
             HelpItem(
                 icon = Icons.AutoMirrored.Filled.List,
                 title = "Cola",
-                description = "Organiza una lista de reproducción con los episodios que quieres escuchar a continuación.")
+                description = "Organiza una lista de reproducción con los episodios que quieres escuchar a continuación."
+            )
             HelpItem(
                 icon = Icons.Default.Settings,
                 title = "Ajustes",
-                description = "Configura las preferencias de la aplicación y consulta esta ayuda.")
+                description = "Configura las preferencias de la aplicación y consulta esta ayuda."
+            )
             ListDivider()
-            Text(text = "Opciones adicionales episodios", style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = "Opciones adicionales episodios",
+                style = MaterialTheme.typography.titleLarge
+            )
             HelpItem(
                 icon = Icons.Default.Download,
                 title = "Descargar Episodio",
@@ -195,7 +203,8 @@ fun SettingsScreen(
 
             Text(text = "Más Información", style = MaterialTheme.typography.titleLarge)
             Button(
-                onClick = { uriHandler.openUri("https://paradigmamedia.org/") },
+                // Usa la URL dinámica obtenida del ViewModel.
+                onClick = { uriHandler.openUri(websiteUrl) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)

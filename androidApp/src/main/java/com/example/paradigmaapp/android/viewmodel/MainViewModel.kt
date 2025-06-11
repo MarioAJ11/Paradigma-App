@@ -48,7 +48,8 @@ class MainViewModel(
     private val context: Context,
     val queueViewModel: QueueViewModel,
     val onGoingViewModel: OnGoingEpisodioViewModel,
-    val downloadedViewModel: DownloadedEpisodioViewModel
+    val downloadedViewModel: DownloadedEpisodioViewModel,
+    val andainaStreamPlayer: AndainaStream
 ) : ViewModel() {
     private val _programas = MutableStateFlow<List<Programa>>(emptyList())
     val programas: StateFlow<List<Programa>> = _programas.asStateFlow()
@@ -113,7 +114,7 @@ class MainViewModel(
     private val _contextualPlaylist = MutableStateFlow<List<Episodio>>(emptyList())
 
     val podcastExoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
-    val andainaStreamPlayer: AndainaStream = AndainaStream(context)
+
     private var progressUpdateJob: Job? = null
     private var radioInfoUpdateJob: Job? = null
     private val podcastPlayerListener: Player.Listener

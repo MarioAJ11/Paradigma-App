@@ -13,4 +13,5 @@ class Database(databaseDriverFactory: DatabaseDriverFactory) {
     // SQLDelight crea estos nombres a partir de los nombres de tus tablas.
     val programaQueries = database.programaEntityQueries
     val episodioQueries = database.episodioEntityQueries
+    val keyValueStoreQueries = database.keyValueStoreQueries
 }

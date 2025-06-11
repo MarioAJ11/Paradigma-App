@@ -1,0 +1,13 @@
+-- Tabla para almacenar pares clave-valor, como la configuración de la app.
+CREATE TABLE KeyValueStore (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+-- Inserta o actualiza un valor en la tienda.
+insertValue:
+INSERT OR REPLACE INTO KeyValueStore(key, value) VALUES (?, ?);
+
+-- Obtiene un valor por su clave.
+getValue:
+SELECT value FROM KeyValueStore WHERE key = :key;

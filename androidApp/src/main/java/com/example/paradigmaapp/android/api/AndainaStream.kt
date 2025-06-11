@@ -15,56 +15,38 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 /**
- * Gestiona la reproducción del stream de audio de Andaina FM y la obtención de metadatos relacionados.
- * Utiliza [ExoPlayer] para la reproducción del stream y [ktorClient] para las llamadas a la API
- * de información de la radio.
+ * Gestiona la reproducción del stream de audio de Andaina FM.
+ * Las URLs se inyectan a través del constructor para permitir la configuración remota.
  *
- * Es importante llamar a [release] cuando esta instancia ya no sea necesaria para liberar
- * los recursos de ExoPlayer y cancelar las corutinas.
- *
- * @property context El [Context] de la aplicación, necesario para inicializar ExoPlayer.
- * @author Mario Alguacil Juárez
+ * @property context El [Context] de la aplicación.
+ * @property streamUrl La URL directa del stream de audio.
+ * @property apiUrl La URL base para la API de información de la radio.
  */
-class AndainaStream(private val context: Context) {
+class AndainaStream(
+    private val context: Context,
+    private val streamUrl: String, // URL dinámica para el audio
+    private val apiUrl: String     // URL dinámica para los metadatos
+) {
 
     private var _exoPlayer: ExoPlayer? = null
-    /**
-     * La instancia de [ExoPlayer] utilizada para la reproducción del stream.
-     * Puede ser `null` si [release] ha sido llamado o si la inicialización falló.
-     */
     val exoPlayer: ExoPlayer? get() = _exoPlayer
 
-    // URLs para el stream de audio y la API de información de la radio.
-    private val streamUrl = "https://radio.andaina.net/8042/stream"
-    private val apiUrl = "https://radio.andaina.net/"
-
-    // CoroutineScope para las operaciones asíncronas de esta clase.
-    // Se utiliza SupervisorJob para que el fallo de una corutina hija no cancele el scope entero.
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineName("AndainaStreamScope"))
 
     init {
-        try {
-            _exoPlayer = ExoPlayer.Builder(context).build()
-        } catch (e: Exception) {
-            // Considerar registrar este error en un sistema de monitoreo en producción.
-            // Por ejemplo: Crashlytics.log("Failed to initialize ExoPlayer for AndainaStream")
-            // Crashlytics.recordException(e)
-            _exoPlayer = null // Asegurar que _exoPlayer es null si la inicialización falla.
-        }
+        // Inicializa el reproductor de Media3 (ExoPlayer).
+        _exoPlayer = ExoPlayer.Builder(context).build()
     }
 
-    /**
-     * Inicia o reanuda la reproducción del stream de audio.
-     * Si ExoPlayer no está preparado, configura el [MediaItem] y lo prepara.
-     */
+    /** Inicia o reanuda la reproducción del stream. */
     fun play() {
         _exoPlayer?.let { player ->
             if (player.playbackState == Player.STATE_IDLE || player.playbackState == Player.STATE_ENDED) {
+                // Usa la URL del stream que se le pasó al ser creado.
                 val mediaItem = MediaItem.fromUri(streamUrl)
                 player.setMediaItem(mediaItem)
                 player.prepare()
@@ -73,95 +55,39 @@ class AndainaStream(private val context: Context) {
         }
     }
 
-    /**
-     * Pausa la reproducción del stream de audio.
-     */
-    fun pause() {
-        _exoPlayer?.pause()
-    }
-
-    /**
-     * Detiene la reproducción del stream y limpia los [MediaItem]s.
-     * El reproductor puede ser preparado y reutilizado después de esto.
-     */
-    fun stop() {
-        _exoPlayer?.stop()
-        _exoPlayer?.clearMediaItems() // Limpia la lista de reproducción actual.
-    }
-
-    /**
-     * Libera todos los recursos asociados con esta instancia de [AndainaStream],
-     * incluyendo el [ExoPlayer] y cancelando todas las corutinas activas en su [scope].
-     * Este método debe ser llamado cuando la instancia ya no es necesaria para prevenir fugas de memoria.
-     */
-    fun release() {
-        _exoPlayer?.release()
-        _exoPlayer = null
-        scope.cancel() // Cancela todas las corutinas lanzadas por este scope.
-    }
-
-    /**
-     * Verifica si el stream se está reproduciendo actualmente.
-     *
-     * @return `true` si el stream se está reproduciendo, `false` en caso contrario o si ExoPlayer es `null`.
-     */
-    fun isPlaying(): Boolean {
-        return _exoPlayer?.isPlaying ?: false
-    }
-
-    /**
-     * Obtiene la información actual de la radio (ej. canción actual, oyentes) desde la API de Andaina.
-     * Esta función es suspendida y debe ser llamada desde una corutina.
-     *
-     * Maneja respuestas JSON no estándar (envueltas en paréntesis) y es tolerante a
-     * formatos de datos flexibles (ej. números como strings).
-     *
-     * @return Un objeto [RadioInfo] si la llamada a la API y la deserialización son exitosas;
-     * `null` si ocurre algún error.
-     */
+    /** Obtiene la información actual de la radio (canción, oyentes, etc). */
     suspend fun getRadioInfo(): RadioInfo? = withContext(Dispatchers.IO) {
         try {
             val rawResponse: String = ktorClient.get {
                 url {
+                    // Usa la URL de la API que se le pasó al ser creado.
                     takeFrom(apiUrl)
                     path("cp/get_info.php")
                     parameters.append("p", "8042")
                 }
             }.body()
 
+            // Procesa la respuesta JSON especial de esta API.
             if (rawResponse.startsWith("(") && rawResponse.endsWith(")")) {
                 val cleanedJson = rawResponse.substring(1, rawResponse.length - 1)
-                val jsonParser = Json {
+                Json {
                     ignoreUnknownKeys = true
                     isLenient = true
                     coerceInputValues = true
-                }
-
-                jsonParser.decodeFromString<RadioInfo>(cleanedJson)
+                }.decodeFromString<RadioInfo>(cleanedJson)
             } else {
-                null // La respuesta no tiene el formato esperado
+                null
             }
         } catch (e: Exception) {
+            println("Error al obtener info de la radio: ${e.message}")
             null
         }
     }
 
-    /**
-     * Configura un listener para los eventos del reproductor.
-     * Es responsabilidad del llamador añadir y quitar este listener.
-     *
-     * @param listener El [Player.Listener] a añadir.
-     */
-    fun addListener(listener: Player.Listener) {
-        _exoPlayer?.addListener(listener)
-    }
-
-    /**
-     * Elimina un listener previamente añadido de los eventos del reproductor.
-     *
-     * @param listener El [Player.Listener] a eliminar.
-     */
-    fun removeListener(listener: Player.Listener) {
-        _exoPlayer?.removeListener(listener)
-    }
+    fun pause() { _exoPlayer?.pause() }
+    fun stop() { _exoPlayer?.stop(); _exoPlayer?.clearMediaItems() }
+    fun release() { _exoPlayer?.release(); _exoPlayer = null; scope.cancel() }
+    fun isPlaying(): Boolean = _exoPlayer?.isPlaying ?: false
+    fun addListener(listener: Player.Listener) { _exoPlayer?.addListener(listener) }
+    fun removeListener(listener: Player.Listener) { _exoPlayer?.removeListener(listener) }
 }

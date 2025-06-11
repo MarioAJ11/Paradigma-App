@@ -36,7 +36,9 @@ class AudioManager: NSObject, ObservableObject {
     private var timeObserverToken: Any?
     private var statusObserver: NSKeyValueObservation?
     private var cancellables = Set<AnyCancellable>()
-    private let liveStreamURL = URL(string: "https://radio.andaina.net/8042/stream")
+    private var liveStreamURL: URL? {
+            URL(string: AppServices.shared.getConfig().liveStreamUrl)
+    }
 
     private override init() {
         super.init()

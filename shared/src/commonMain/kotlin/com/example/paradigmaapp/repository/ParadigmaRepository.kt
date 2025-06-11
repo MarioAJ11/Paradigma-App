@@ -22,17 +22,17 @@ import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Repositorio principal que gestiona datos de programas y episodios.
- * Combina una caché local (SQLDelight) y llamadas de red (Ktor) para
- * proporcionar una experiencia de usuario rápida y offline-first.
  *
  * @param database Instancia de la base de datos local para la gestión de la caché.
- * @author Mario Alguacil Juárez
+ * @param baseUrl La URL base para la API de WordPress, obtenida de la configuración.
  */
-class ParadigmaRepository(private val database: Database) : ProgramaRepository, EpisodioRepository {
+class ParadigmaRepository(
+    private val database: Database,
+    private val baseUrl: String
+) : ProgramaRepository, EpisodioRepository {
 
     private val programaQueries = database.programaQueries
     private val episodioQueries = database.episodioQueries
-    private val baseUrl = "https://pruebas.paradigmamedia.org/wp-json/wp/v2"
 
     // --- FUNCIONES DE PROGRAMA ---
 

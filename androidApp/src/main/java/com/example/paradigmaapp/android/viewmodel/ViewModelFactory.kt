@@ -5,25 +5,28 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
+import com.example.paradigmaapp.android.api.AndainaStream
 import com.example.paradigmaapp.android.data.AppPreferences
+import com.example.paradigmaapp.config.RemoteConfigService
 import com.example.paradigmaapp.repository.ParadigmaRepository
 
 /**
- * Factoría personalizada para la creación de instancias de [ViewModel].
- * Permite inyectar dependencias necesarias (como repositorios, [AppPreferences], [Context])
- * a cada ViewModel en el momento de su creación.
+ * Factoría personalizada para la creación de ViewModels.
+ * Inyecta todas las dependencias necesarias a cada ViewModel.
  *
- * @property appPreferences Instancia de [AppPreferences] para la gestión de preferencias.
- * @property wordpressDataSource Instancia de [ParadigmaRepository], que implementa los repositorios.
- * @property applicationContext El [Context] de la aplicación.
- *
- * @author Mario Alguacil Juárez
+ * @param appPreferences Instancia para la gestión de preferencias.
+ * @param wordpressDataSource Instancia del repositorio principal.
+ * @param applicationContext El Context de la aplicación.
+ * @param remoteConfigService El servicio para obtener URLs de forma remota.
+ * @param andainaStream El servicio para gestionar la radio en directo.
  */
 @Suppress("UNCHECKED_CAST")
 class ViewModelFactory(
     private val appPreferences: AppPreferences,
     private val wordpressDataSource: ParadigmaRepository,
-    private val applicationContext: Context
+    private val applicationContext: Context,
+    private val remoteConfigService: RemoteConfigService,
+    private val andainaStream: AndainaStream
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -31,9 +34,11 @@ class ViewModelFactory(
 
         return when {
             modelClass.isAssignableFrom(MainViewModel::class.java) -> {
+                // Creamos los ViewModels de los que depende MainViewModel.
                 val queueVM = QueueViewModel(appPreferences, wordpressDataSource)
                 val onGoingVM = OnGoingEpisodioViewModel(appPreferences)
                 val downloadedVM = DownloadedEpisodioViewModel(appPreferences, applicationContext)
+
                 MainViewModel(
                     programaRepository = wordpressDataSource,
                     episodioRepository = wordpressDataSource,
@@ -41,24 +46,22 @@ class ViewModelFactory(
                     context = applicationContext,
                     queueViewModel = queueVM,
                     onGoingViewModel = onGoingVM,
-                    downloadedViewModel = downloadedVM
+                    downloadedViewModel = downloadedVM,
+                    andainaStreamPlayer = andainaStream
                 ) as T
             }
+            modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
+                SettingsViewModel(appPreferences, remoteConfigService) as T
+            }
+            // El resto de ViewModels se mantienen igual.
             modelClass.isAssignableFrom(ProgramaViewModel::class.java) -> {
-                ProgramaViewModel(
-                    programaRepository = wordpressDataSource,
-                    episodioRepository = wordpressDataSource,
-                    savedStateHandle = savedStateHandle
-                ) as T
+                ProgramaViewModel(wordpressDataSource, wordpressDataSource, savedStateHandle) as T
             }
             modelClass.isAssignableFrom(EpisodeDetailViewModel::class.java) -> {
-                EpisodeDetailViewModel(
-                    episodioRepository = wordpressDataSource,
-                    savedStateHandle = savedStateHandle
-                ) as T
+                EpisodeDetailViewModel(wordpressDataSource, savedStateHandle) as T
             }
             modelClass.isAssignableFrom(SearchViewModel::class.java) -> {
-                SearchViewModel(episodioRepository = wordpressDataSource) as T
+                SearchViewModel(wordpressDataSource) as T
             }
             modelClass.isAssignableFrom(QueueViewModel::class.java) -> {
                 QueueViewModel(appPreferences, wordpressDataSource) as T
@@ -69,10 +72,7 @@ class ViewModelFactory(
             modelClass.isAssignableFrom(OnGoingEpisodioViewModel::class.java) -> {
                 OnGoingEpisodioViewModel(appPreferences) as T
             }
-            modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
-                SettingsViewModel(appPreferences) as T
-            }
-            else -> throw IllegalArgumentException("Clase ViewModel desconocida en ViewModelFactory: ${modelClass.name}")
+            else -> throw IllegalArgumentException("Clase ViewModel desconocida: ${modelClass.name}")
         }
     }
 }

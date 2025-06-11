@@ -3,17 +3,19 @@ import shared
 
 /**
  * ViewModel para gestionar el estado y los metadatos de la radio en directo.
+ * Ahora usa la instancia compartida del SDK.
  */
 @MainActor
 class LiveRadioViewModel: ObservableObject {
 
     @Published var radioInfo: RadioInfo? = nil
 
-    private let sdk = ParadigmaSDK()
+    // Usa la instancia única del SDK.
+    private let sdk = AppServices.shared.sdk
     private var timer: Timer?
 
     init() {
-        // Inicia un temporizador para refrescar la información de la radio cada 15 segundos.
+        // Inicia un temporizador para refrescar la información.
         timer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
             Task {
                 await self?.fetchRadioInfo()
@@ -23,13 +25,10 @@ class LiveRadioViewModel: ObservableObject {
         Task { await fetchRadioInfo() }
     }
 
-    /// Obtiene la información más reciente de la radio desde el SDK.
+    /// Obtiene la información más reciente de la radio.
     private func fetchRadioInfo() async {
         do {
-            // Necesitamos una función en el SDK para esto.
-            // Suponiendo que la añadimos, la llamaríamos aquí.
-            // self.radioInfo = try await asyncResult(for: sdk.getRadioInfo())
-            print("Función getRadioInfo() en el SDK aún no implementada.")
+            self.radioInfo = try await asyncResult(for: sdk.getRadioInfo())
         } catch {
             print("Error al obtener info de la radio: \(error.localizedDescription)")
             self.radioInfo = nil
@@ -37,7 +36,6 @@ class LiveRadioViewModel: ObservableObject {
     }
 
     deinit {
-        // Detiene el temporizador cuando el ViewModel se destruye.
         timer?.invalidate()
     }
 }
