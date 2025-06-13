@@ -118,45 +118,53 @@ private val AppTypography = Typography(
 )
 
 /**
- * Composable que aplica el tema de Material Design 3 a la aplicación.
- * Permite cambiar dinámicamente entre tema claro y oscuro basado en la preferencia del usuario
- * o la configuración del sistema. También ajusta los colores de las barras de sistema (estado y navegación).
+ * Composable central que aplica el tema de Material Design 3 a toda la aplicación.
+ * Este componente es clave para el cambio de tema dinámico, ya que reacciona a los cambios de estado
+ * y redibuja toda la UI anidada con el esquema de colores y tipografía correctos.
  *
- * @param manualDarkThemeSetting Preferencia manual del usuario para el tema:
- * `true` para forzar tema oscuro, `false` para forzar tema claro,
- * `null` para seguir la configuración del sistema.
- * @param content El contenido Composable al que se aplicará el tema.
+ * @param manualDarkThemeSetting La preferencia de tema explícita del usuario.
+ * - `true`: Forzar tema oscuro.
+ * - `false`: Forzar tema claro.
+ * - `null`: Usar la configuración de tema del sistema operativo.
+ * @param content El contenido Composable de la aplicación al que se le aplicará este tema.
  *
  * @author Mario Alguacil Juárez
  */
 @Composable
 fun Theme(
-    manualDarkThemeSetting: Boolean?, // Acepta la preferencia manual
+    manualDarkThemeSetting: Boolean?,
     content: @Composable () -> Unit
 ) {
-    // Determina si se debe usar el tema oscuro.
+    // Esta estructura 'when' determina qué tema usar basándose en la preferencia del usuario.
+    // Si la preferencia es nula, recurre a isSystemInDarkTheme() para seguir al sistema.
     val useDarkTheme = when (manualDarkThemeSetting) {
-        true -> true  // Forzar oscuro
-        false -> false // Forzar claro
-        null -> isSystemInDarkTheme() // Seguir al sistema
+        true -> true
+        false -> false
+        null -> isSystemInDarkTheme()
     }
 
+    // Se elige el ColorScheme completo (Dark o Light) según la decisión anterior.
     val colorScheme = if (useDarkTheme) DarkColorScheme else LightColorScheme
-    val view = LocalView.current
 
-    // Aplica efectos laterales para cambiar los colores de las barras de sistema
-    // solo si no se está en modo de previsualización de Compose.
+    // SideEffect se usa para ejecutar código que no es de Compose (modificar la Window de Android)
+    // cada vez que el composable se recompone.
+    val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.background.toArgb() // Color de fondo de la app para la barra de estado
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !useDarkTheme // Iconos de barra de estado claros/oscuros
 
-            window.navigationBarColor = colorScheme.surfaceContainerLowest.toArgb() // Color para la barra de navegación
-            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !useDarkTheme // Iconos de barra de navegación claros/oscuros
+            // Ajusta el color de la barra de estado y el color de sus iconos (claros u oscuros).
+            window.statusBarColor = colorScheme.background.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !useDarkTheme
+
+            // Ajusta el color de la barra de navegación y el color de sus iconos.
+            window.navigationBarColor = colorScheme.surfaceContainerLowest.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !useDarkTheme
         }
     }
 
+    // MaterialTheme es el componente que propaga los colores y la tipografía
+    // a todos los Composables hijos. Al cambiar `colorScheme`, toda la app se actualiza.
     MaterialTheme(
         colorScheme = colorScheme,
         typography = AppTypography,

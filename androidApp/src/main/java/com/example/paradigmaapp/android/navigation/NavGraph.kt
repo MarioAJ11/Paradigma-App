@@ -48,7 +48,8 @@ fun NavGraph(
     navController: NavHostController = rememberNavController(),
     viewModelFactory: ViewModelFactory,
     mainViewModel: MainViewModel,
-    searchViewModel: SearchViewModel
+    searchViewModel: SearchViewModel,
+    settingsViewModel: SettingsViewModel
 ) {
     // Recolecta los estados del ViewModel para que la UI se actualice en tiempo real.
     val coroutineScope = rememberCoroutineScope()
@@ -97,7 +98,7 @@ fun NavGraph(
                     composable(Screen.Queue.route) { QueueScreen(queueViewModel = mainViewModel.queueViewModel, mainViewModel = mainViewModel, downloadedViewModel = mainViewModel.downloadedViewModel, onEpisodeSelected = { mainViewModel.selectEpisode(it) }, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() }) }
                     composable(Screen.OnGoing.route) { OnGoingEpisodioScreen(onGoingEpisodioViewModel = mainViewModel.onGoingViewModel, mainViewModel = mainViewModel, queueViewModel = mainViewModel.queueViewModel, downloadedViewModel = mainViewModel.downloadedViewModel, onEpisodeSelected = { mainViewModel.selectEpisode(it) }, onEpisodeLongClicked = { navController.navigate(Screen.EpisodeDetail.createRoute(it.id)) }, onBackClick = { navController.popBackStack() }) }
                     composable(route = Screen.EpisodeDetail.route, arguments = listOf(navArgument("episodeId") { type = NavType.IntType })) { navBackStackEntry -> val episodeDetailViewModel: EpisodeDetailViewModel = viewModel(key = "episode_detail_vm_${navBackStackEntry.arguments?.getInt("episodeId")}", viewModelStoreOwner = navBackStackEntry, factory = viewModelFactory); EpisodeDetailScreen(episodeDetailViewModel, mainViewModel, mainViewModel.queueViewModel, mainViewModel.downloadedViewModel, onBackClick = { navController.popBackStack() }) }
-                    composable(Screen.Settings.route) { SettingsScreen(settingsViewModel = viewModel(factory = viewModelFactory), onBackClick = { navController.popBackStack() }) }
+                    composable(Screen.Settings.route) { SettingsScreen(settingsViewModel = settingsViewModel, onBackClick = { navController.popBackStack() }) }
                 }
 
                 // UI persistente en la parte inferior (reproductor y menú).

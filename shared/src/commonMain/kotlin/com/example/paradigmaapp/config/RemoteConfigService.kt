@@ -15,8 +15,7 @@ import kotlinx.serialization.json.Json
  */
 class RemoteConfigService(private val database: Database) {
 
-    // --- ¡IMPORTANTE! Reemplaza esta URL por la URL "Raw" de tu fichero en GitHub ---
-    private val configUrl = "https://raw.githubusercontent.com/tu-usuario/tu-repositorio/main/app_config.json"
+    private val configUrl = "https://raw.githubusercontent.com/MarioAJ11/apiParadigma/refs/heads/main/app_config.json"
 
     private var inMemoryConfig: AppConfig? = null
 

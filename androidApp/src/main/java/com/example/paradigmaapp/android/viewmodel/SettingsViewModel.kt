@@ -19,7 +19,6 @@ class SettingsViewModel(
     private val remoteConfigService: RemoteConfigService
 ) : ViewModel() {
 
-    // --- ESTADOS DE PREFERENCIAS (sin cambios) ---
     private val _isStreamActive = MutableStateFlow(appPreferences.loadIsStreamActive())
     val isStreamActive: StateFlow<Boolean> = _isStreamActive.asStateFlow()
 

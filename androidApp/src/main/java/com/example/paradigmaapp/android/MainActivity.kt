@@ -35,48 +35,45 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         // --- INICIALIZACIÓN DE DEPENDENCIAS ---
-
-        // 1. Dependencias básicas de la app.
         val appPreferencesInstance = AppPreferences(applicationContext)
         val databaseDriverFactory = DatabaseDriverFactory(applicationContext)
         val database = Database(databaseDriverFactory)
 
-        // 2. Se crea e inicia el servicio de configuración remota.
         remoteConfigService = RemoteConfigService(database)
         lifecycleScope.launch(Dispatchers.IO) {
             remoteConfigService.fetchAndCacheConfig()
         }
 
-        // 3. Se obtiene la configuración (remota, caché o por defecto).
         val config = remoteConfigService.getConfig()
-
-        // 4. Se crea el Repositorio y el servicio de Andaina con las URLs dinámicas.
         val paradigmaRepository = ParadigmaRepository(database, config.wordpressApiBaseUrl)
         val andainaStream = AndainaStream(applicationContext, config.liveStreamUrl, config.liveStreamApiUrl)
 
-        // 5. Se crea la factoría de ViewModels pasándole TODAS las dependencias.
         viewModelFactory = ViewModelFactory(
             appPreferences = appPreferencesInstance,
             wordpressDataSource = paradigmaRepository,
             applicationContext = applicationContext,
             remoteConfigService = remoteConfigService,
-            andainaStream = andainaStream // Se la pasamos a la factoría.
+            andainaStream = andainaStream
         )
 
         // --- CONSTRUCCIÓN DE LA UI ---
         setContent {
+            // Se crea una ÚNICA instancia del SettingsViewModel para toda la Activity.
             val settingsViewModel: SettingsViewModel = ViewModelProvider(this, viewModelFactory)[SettingsViewModel::class.java]
             val manualDarkThemeSetting by settingsViewModel.isManuallySetToDarkTheme.collectAsState()
 
+            // Se aplica el tema observando el estado de ese ViewModel.
             Theme(manualDarkThemeSetting = manualDarkThemeSetting) {
-                // La creación de los ViewModels ahora es limpia, usando la misma factoría para todos.
+                // Se crean los otros ViewModels.
                 val mainViewModel: MainViewModel = ViewModelProvider(this, viewModelFactory)[MainViewModel::class.java]
                 val searchViewModel: SearchViewModel = ViewModelProvider(this, viewModelFactory)[SearchViewModel::class.java]
 
+                // Se pasan los ViewModels necesarios al Composable raíz de la app.
                 ParadigmaApp(
                     viewModelFactory = viewModelFactory,
                     mainViewModel = mainViewModel,
-                    searchViewModel = searchViewModel
+                    searchViewModel = searchViewModel,
+                    settingsViewModel = settingsViewModel
                 )
             }
         }

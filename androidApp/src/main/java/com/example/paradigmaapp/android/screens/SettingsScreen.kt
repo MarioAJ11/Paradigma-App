@@ -2,13 +2,13 @@ package com.example.paradigmaapp.android.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -16,7 +16,6 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Podcasts
@@ -30,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -44,14 +44,15 @@ import androidx.compose.ui.unit.dp
 import com.example.paradigmaapp.android.ui.HelpItem
 import com.example.paradigmaapp.android.ui.ListDivider
 import com.example.paradigmaapp.android.ui.SettingItemRow
+import com.example.paradigmaapp.android.ui.ThemeSelectionButton
 import com.example.paradigmaapp.android.viewmodel.SettingsViewModel
 
 /**
- * Pantalla de Ajustes de la aplicación.
- * Permite al usuario configurar la app y acceder a una guía de ayuda.
+ * Composable que renderiza la pantalla de Ajustes y la Guía de Ayuda de la aplicación.
+ * Permite al usuario configurar preferencias y consultar una guía detallada.
  *
- * @param settingsViewModel El ViewModel que gestiona el estado de los ajustes.
- * @param onBackClick Lambda para manejar la acción de retroceso.
+ * @param settingsViewModel El ViewModel que proporciona y gestiona el estado de los ajustes.
+ * @param onBackClick Lambda que se invoca cuando el usuario pulsa el botón de retroceso.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,9 +84,9 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp) // Espaciado general
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Sección: Preferencias Generales
+            // Sección de Preferencias
             Text(text = "Preferencias", style = MaterialTheme.typography.titleLarge)
             SettingItemRow(
                 title = "Abrir con Radio en Directo",
@@ -98,31 +99,34 @@ fun SettingsScreen(
             }
             ListDivider()
 
-            // Sección: Apariencia
+            // Sección de Apariencia
             Text(text = "Apariencia", style = MaterialTheme.typography.titleLarge)
-            SettingItemRow(title = "Tema Oscuro") {
-                Switch(
-                    checked = isManuallySetToDarkTheme == true,
-                    onCheckedChange = { isChecked ->
-                        settingsViewModel.setThemePreference(if (isChecked) true else false)
-                    }
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = { settingsViewModel.setThemePreference(null) },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = if (isManuallySetToDarkTheme == null) ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) else ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                border = if (isManuallySetToDarkTheme != null) ButtonDefaults.outlinedButtonBorder else null
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Seguir tema del sistema")
+                ThemeSelectionButton(
+                    onClick = { settingsViewModel.setThemePreference(false) },
+                    text = "Claro",
+                    isSelected = isManuallySetToDarkTheme == false,
+                    modifier = Modifier.weight(1f)
+                )
+                ThemeSelectionButton(
+                    onClick = { settingsViewModel.setThemePreference(true) },
+                    text = "Oscuro",
+                    isSelected = isManuallySetToDarkTheme == true,
+                    modifier = Modifier.weight(1f)
+                )
+                ThemeSelectionButton(
+                    onClick = { settingsViewModel.setThemePreference(null) },
+                    text = "Sistema",
+                    isSelected = isManuallySetToDarkTheme == null,
+                    modifier = Modifier.weight(1f)
+                )
             }
             ListDivider()
 
+            // --- SECCIONES DE AYUDA RESTAURADAS ---
             Text(text = "Ayuda y Funcionalidades", style = MaterialTheme.typography.titleLarge)
             HelpItem(
                 icon = Icons.Default.TouchApp,
@@ -144,7 +148,7 @@ fun SettingsScreen(
             )
             HelpItem(
                 icon = Icons.Default.VolumeUp,
-                title = "Control de Volume",
+                title = "Control de Volumen",
                 description = "Pulsa el icono del altavoz para mostrar y ajustar el nivel del volumen."
             )
             HelpItem(
@@ -160,59 +164,30 @@ fun SettingsScreen(
                 title = "Inicio",
                 description = "El icono de la pestaña activa se convierte en 'Inicio' para volver rápidamente a la lista de programas."
             )
-            HelpItem(
-                icon = Icons.Default.Search,
-                title = "Buscar",
-                description = "Encuentra cualquier episodio por título o descripción."
-            )
-            HelpItem(
-                icon = Icons.Default.History,
-                title = "Continuar",
-                description = "Aquí aparecen los episodios que has empezado a escuchar pero no has terminado."
-            )
-            HelpItem(
-                icon = Icons.Default.Download,
-                title = "Descargas",
-                description = "Accede a los episodios guardados para escucharlos sin conexión."
-            )
-            HelpItem(
-                icon = Icons.AutoMirrored.Filled.List,
-                title = "Cola",
-                description = "Organiza una lista de reproducción con los episodios que quieres escuchar a continuación."
-            )
-            HelpItem(
-                icon = Icons.Default.Settings,
-                title = "Ajustes",
-                description = "Configura las preferencias de la aplicación y consulta esta ayuda."
-            )
+            HelpItem(icon = Icons.Default.Search, title = "Buscar", description = "Encuentra cualquier episodio por título o descripción.")
+            HelpItem(icon = Icons.Default.History, title = "Continuar", description = "Aquí aparecen los episodios que has empezado a escuchar pero no has terminado.")
+            HelpItem(icon = Icons.Default.Download, title = "Descargas", description = "Accede a los episodios guardados para escucharlos sin conexión.")
+            HelpItem(icon = Icons.AutoMirrored.Filled.List, title = "Cola", description = "Organiza una lista de reproducción con los episodios que quieres escuchar a continuación.")
+            HelpItem(icon = Icons.Default.Settings, title = "Ajustes", description = "Configura las preferencias de la aplicación y consulta esta ayuda.")
             ListDivider()
-            Text(
-                text = "Opciones adicionales episodios",
-                style = MaterialTheme.typography.titleLarge
-            )
-            HelpItem(
-                icon = Icons.Default.Download,
-                title = "Descargar Episodio",
-                description = "Desde los tres puntitos o la vista detalla del episodio, puedes descargarlo o eliminarlo a tu dispositivo."
-            )
-            HelpItem(
-                icon = Icons.Default.List,
-                title = "Añadir a cola",
-                description = "Desde los tres puntitos o la vista detalla del episodio, puedes añadirlo o elimnarlo a la cola de reproducción."
-            )
 
+            Text(text = "Opciones adicionales episodios", style = MaterialTheme.typography.titleLarge)
+            HelpItem(icon = Icons.Default.Download, title = "Descargar Episodio", description = "Desde los tres puntitos o la vista detalla del episodio, puedes descargarlo o eliminarlo a tu dispositivo.")
+            HelpItem(icon = Icons.AutoMirrored.Filled.List, title = "Añadir a cola", description = "Desde los tres puntitos o la vista detalla del episodio, puedes añadirlo o elimnarlo a la cola de reproducción.")
+            ListDivider()
+
+
+            // Sección de Más Información
             Text(text = "Más Información", style = MaterialTheme.typography.titleLarge)
             Button(
-                // Usa la URL dinámica obtenida del ViewModel.
                 onClick = { uriHandler.openUri(websiteUrl) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
             ) {
                 Text("Visitar web de Paradigma Media")
             }
 
-            Spacer(modifier = Modifier.height(126.dp))
+            Spacer(modifier = Modifier.height(166.dp))
         }
     }
 }

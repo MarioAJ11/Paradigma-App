@@ -8,6 +8,7 @@ import com.example.paradigmaapp.android.navigation.NavGraph
 import com.example.paradigmaapp.android.screens.OnboardingScreen
 import com.example.paradigmaapp.android.viewmodel.MainViewModel
 import com.example.paradigmaapp.android.viewmodel.SearchViewModel
+import com.example.paradigmaapp.android.viewmodel.SettingsViewModel
 import com.example.paradigmaapp.android.viewmodel.ViewModelFactory
 
 /**
@@ -16,38 +17,33 @@ import com.example.paradigmaapp.android.viewmodel.ViewModelFactory
  * o la estructura de navegación principal de la app (`NavGraph`) basándose en si
  * el usuario ya ha completado la introducción.
  *
- * @author Mario Alguacil Juárez
  * @param viewModelFactory La factoría para crear instancias de ViewModels.
  * @param mainViewModel El ViewModel principal que gestiona el estado global.
  * @param searchViewModel El ViewModel para la funcionalidad de búsqueda.
+ * @param settingsViewModel El ViewModel para los ajustes, que se pasará al NavGraph.
  */
 @Composable
 fun ParadigmaApp(
     viewModelFactory: ViewModelFactory,
     mainViewModel: MainViewModel,
-    searchViewModel: SearchViewModel
+    searchViewModel: SearchViewModel,
+    settingsViewModel: SettingsViewModel
 ) {
-    // Se suscribe al estado de 'onboarding' desde el ViewModel.
-    // La UI se recompondrá automáticamente cuando este valor cambie.
     val hasCompletedOnboarding by mainViewModel.onboardingCompleted.collectAsState()
 
     if (hasCompletedOnboarding) {
-        // --- ESTADO COMPLETADO: Muestra la aplicación principal ---
-        // Crea una instancia del NavController para la navegación.
         val navController = rememberNavController()
+        // Pasa la instancia del ViewModel de ajustes al grafo de navegación.
         NavGraph(
             navController = navController,
             viewModelFactory = viewModelFactory,
             mainViewModel = mainViewModel,
-            searchViewModel = searchViewModel
+            searchViewModel = searchViewModel,
+            settingsViewModel = settingsViewModel
         )
     } else {
-        // --- ESTADO INICIAL: Muestra la pantalla de bienvenida ---
         OnboardingScreen(
             onContinueClicked = {
-                // Al pulsar "ACEPTAR", se actualiza el estado en el ViewModel.
-                // Esto provocará que 'hasCompletedOnboarding' cambie a 'true'
-                // y la UI se recomponga para mostrar el NavGraph.
                 mainViewModel.setOnboardingComplete()
             }
         )
