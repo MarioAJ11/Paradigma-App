@@ -1,84 +1,89 @@
 import Foundation
 import shared
-import Combine
 
 /**
- * ViewModel para la pantalla de búsqueda.
- * Gestiona el texto de búsqueda, realiza la llamada a la API y publica los resultados.
- * Implementa un "debounce" para evitar realizar búsquedas con cada letra que escribe el usuario.
+ * ViewModel para la pantalla de detalle de un programa.
+ *
+ * Carga la información del programa y una lista paginada de sus episodios.
+ * Gestiona el estado de carga y la paginación infinita (cargar más al hacer scroll).
  */
 @MainActor
-class SearchViewModel: ObservableObject {
+class ProgramaDetailViewModel: ObservableObject {
 
-    // MARK: - Propiedades Publicadas
-
-    /// El texto actual en el campo de búsqueda, vinculado a la UI.
-    @Published var searchText = ""
-
-    /// La lista de episodios encontrados que la vista mostrará.
-    @Published var searchResults: [Episodio] = []
-
-    /// Indica si una búsqueda está en curso.
+    @Published var programa: Programa? = nil
+    @Published var episodios: [Episodio] = []
     @Published var isLoading = false
+    @Published var isLoadingMore = false
+    @Published var errorMessage: String? = nil
 
-    /// Muestra mensajes informativos en la vista (ej: "Escribe para buscar", "No hay resultados").
-    @Published var infoMessage: String? = "Escribe al menos 3 caracteres para buscar."
+    // Utiliza la instancia única del SDK.
+    private let sdk = AppServices.shared.sdk
+    private let programaId: Int32
+    private var currentPage = 1
+    private var canLoadMore = true
 
-    // MARK: - Propiedades Privadas
-
-    private let sdk: ParadigmaSDK
-    private var cancellables = Set<AnyCancellable>()
-
-    // MARK: - Inicializador
-
-    init() {
-        // Inicializamos el SDK con su repositorio, creando las dependencias de la base de datos.
-        let databaseDriverFactory = DatabaseDriverFactory()
-        let database = Database(databaseDriverFactory: databaseDriverFactory)
-        let repository = ParadigmaRepository(database: database)
-        self.sdk = ParadigmaSDK(repository: repository)
-
-        setupSearchPublisher()
+    init(programaId: Int32) {
+        self.programaId = programaId
     }
 
-    // MARK: - Lógica de Búsqueda
-
-    private func setupSearchPublisher() {
-        $searchText
-            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
-            .removeDuplicates()
-            .filter { $0.count >= 3 }
-            .sink { [weak self] searchText in
-                Task {
-                    await self?.performSearch(query: searchText)
-                }
-            }
-            .store(in: &cancellables)
-
-        $searchText
-            .filter { $0.count < 3 }
-            .sink { [weak self] _ in
-                self?.searchResults = []
-                self?.infoMessage = "Escribe al menos 3 caracteres para buscar."
-            }
-            .store(in: &cancellables)
-    }
-
-    private func performSearch(query: String) async {
+    /**
+     * Carga los datos iniciales: detalles del programa y la primera página de episodios.
+     */
+    func loadInitialData() async {
+        guard episodios.isEmpty else { return }
         isLoading = true
-        infoMessage = nil
-
+        errorMessage = nil
         do {
-            let results = try await asyncResult(for: sdk.buscarEpisodios(searchTerm: query))
-            self.searchResults = results
+            // Carga los detalles del programa y la primera página de episodios en paralelo.
+            async let programaDetails = asyncResult(for: sdk.getPrograma(programaId: self.programaId))
+            async let firstPageEpisodios = fetchEpisodios(page: 1)
 
-            if results.isEmpty {
-                self.infoMessage = "No se encontraron resultados para \"\(query)\"."
-            }
+            self.programa = try await programaDetails
+            self.episodios = try await firstPageEpisodios
         } catch {
-            self.infoMessage = "Error en la búsqueda: \(error.localizedDescription)"
+            self.errorMessage = "Error al cargar los datos del programa."
+        }
+        isLoading = false
+    }
+
+    /**
+     * Carga la siguiente página de episodios si es necesario y posible.
+     * Se llama cuando el usuario se acerca al final de la lista.
+     */
+    func loadMoreEpisodiosIfNeeded(currentEpisodio: Episodio?) {
+        guard let currentEpisodio = currentEpisodio,
+              !isLoadingMore,
+              canLoadMore,
+              let lastEpisodio = episodios.last,
+              lastEpisodio.id == currentEpisodio.id else {
+            return
         }
 
-        isLoading = false
+        Task {
+            isLoadingMore = true
+            currentPage += 1
+            do {
+                let newEpisodios = await fetchEpisodios(page: currentPage)
+                if newEpisodios.isEmpty {
+                    canLoadMore = false
+                } else {
+                    self.episodios.append(contentsOf: newEpisodios)
+                }
+            }
+            isLoadingMore = false
+        }
+    }
+
+    /**
+     * Función auxiliar para obtener una página de episodios desde el SDK.
+     */
+    private func fetchEpisodios(page: Int) async -> [Episodio] {
+        do {
+            return try await asyncResult(for: sdk.getEpisodiosPorPrograma(programaId: self.programaId, page: Int32(page)))
+        } catch {
+            // Si falla la carga de una página, se asume que no se puede cargar más.
+            canLoadMore = false
+            return []
+        }
     }
 }
