@@ -55,7 +55,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun OnGoingEpisodioScreen(
     onGoingEpisodioViewModel: OnGoingEpisodioViewModel,
-    mainViewModel: MainViewModel, // <-- PARÁMETRO AÑADIDO
+    mainViewModel: MainViewModel,
     queueViewModel: QueueViewModel,
     downloadedViewModel: DownloadedEpisodioViewModel,
     onEpisodeSelected: (Episodio) -> Unit,
@@ -66,7 +66,7 @@ fun OnGoingEpisodioScreen(
     val onGoingEpisodios by onGoingEpisodioViewModel.onGoingEpisodios.collectAsState()
     val queueEpisodeIds by queueViewModel.queueEpisodeIds.collectAsState()
     val downloadedEpisodios by downloadedViewModel.downloadedEpisodios.collectAsState()
-    val preparingEpisodeId by mainViewModel.preparingEpisodeId.collectAsState() // <-- AÑADIDO
+    val preparingEpisodeId by mainViewModel.preparingEpisodeId.collectAsState()
 
     // Controladores de UI y corutinas
     val snackbarHostState = remember { SnackbarHostState() }
@@ -108,7 +108,7 @@ fun OnGoingEpisodioScreen(
                         val isLoading = episodio.id == preparingEpisodeId
                         EpisodioListItem(
                             episodio = episodio,
-                            isLoading = isLoading, // <-- Pasando el estado de carga
+                            isLoading = isLoading,
                             onPlayEpisode = { onEpisodeSelected(it) },
                             onEpisodeLongClick = { onEpisodeLongClicked(it) },
                             onAddToQueue = { queueViewModel.addEpisodeToQueue(it) },
