@@ -90,7 +90,7 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session) // Integración con MediaSession
 
-    implementation("androidx.paging:paging-compose:3.3.0")
+    implementation("androidx.paging:paging-compose:3.3.6")
 
     // Ktor (Networking)
     implementation(libs.ktor.client.android)

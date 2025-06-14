@@ -9,19 +9,12 @@ import SwiftUI
 @MainActor
 class OnGoingViewModel: ObservableObject {
 
-    // MARK: - Propiedades Publicadas
-
-    /// La lista de episodios en curso, ordenados por el más reciente.
     @Published var onGoingEpisodios: [Episodio] = []
 
-    // MARK: - Propiedades Privadas
-
-    /// El diccionario que se guarda en UserDefaults: [ID_Episodio: Progreso_en_segundos]
     @AppStorage("on_going_progress_map") private var progressMapData: Data = Data()
 
-    private let sdk = ParadigmaSDK()
-
-    // MARK: - Métodos Públicos
+    // Se utiliza la instancia compartida del SDK en lugar de crear una nueva.
+    private let sdk = AppServices.shared.sdk
 
     /**
      * Carga y actualiza la lista de episodios en curso a partir de los datos guardados.
@@ -29,8 +22,6 @@ class OnGoingViewModel: ObservableObject {
     func loadOnGoingEpisodios() async {
         let progressMap = decodeProgressMap()
         var fetchedEpisodios: [Episodio] = []
-
-        // No cargamos episodios cuyo progreso sea 0.
         let validIds = progressMap.filter { $0.value > 0 }.keys
 
         for id in validIds {
@@ -38,15 +29,11 @@ class OnGoingViewModel: ObservableObject {
                 fetchedEpisodios.append(episodio)
             }
         }
-
         self.onGoingEpisodios = fetchedEpisodios
     }
 
     /**
      * Guarda el progreso de un episodio.
-     * - Parameters:
-     * - episodioId: El ID del episodio.
-     * - progressSeconds: El segundo actual de la reproducción.
      */
     func saveProgress(episodioId: Int, progressSeconds: Double) {
         var progressMap = decodeProgressMap()
@@ -54,8 +41,7 @@ class OnGoingViewModel: ObservableObject {
         encodeAndSave(progressMap)
     }
 
-    // MARK: - Lógica de Persistencia
-
+    // El resto de la clase (decode, encode) se mantiene igual.
     private func decodeProgressMap() -> [Int: Double] {
         guard let map = try? JSONDecoder().decode([Int: Double].self, from: progressMapData) else {
             return [:]

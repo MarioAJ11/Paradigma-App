@@ -3,9 +3,6 @@ import shared
 
 /**
  * Vista que muestra los detalles completos de un episodio específico.
- * Proporciona información como título, imagen, descripción, fecha, duración,
- * y programas asociados. Ofrece acciones como reproducir, añadir/quitar de cola
- * y descargar/eliminar descarga.
  */
 struct EpisodeDetailView: View {
 
@@ -50,10 +47,11 @@ struct EpisodeDetailView: View {
                     .font(.headlineSmall).fontWeight(.bold)
                     .multilineTextAlignment(.center)
 
-                // Metadatos (Fecha, Duración, Programa)
                 HStack(spacing: 16) {
                     MetaDataItem(icon: "calendar", text: episodio.date.formattedDate())
-                    if episodio.duration.isNotBlank() && episodio.duration != "--:--" {
+                    
+                    // Se accede a 'isNotBlank' como una propiedad, sin paréntesis.
+                    if episodio.duration.isNotBlank && episodio.duration != "--:--" {
                         MetaDataItem(icon: "timer", text: episodio.duration)
                     }
                 }
@@ -67,7 +65,6 @@ struct EpisodeDetailView: View {
             }
             .padding(.horizontal)
 
-            // Descripción
             if let description = (episodio.content ?? episodio.excerpt)?.extractMeaningfulDescription(), !description.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Descripción").font(.titleMedium).fontWeight(.semibold)
@@ -79,7 +76,8 @@ struct EpisodeDetailView: View {
             }
         }
     }
-
+    
+    // El resto de la vista (MetaDataItem, ActionButtons) se mantiene igual.
     private struct MetaDataItem: View {
         let icon: String
         let text: String
@@ -99,14 +97,12 @@ struct EpisodeDetailView: View {
 
         var body: some View {
             HStack(spacing: 20) {
-                // Botón Play
                 Button(action: { audioManager.selectEpisode(episodio) }) {
                     Image(systemName: "play.circle.fill")
                         .font(.system(size: 44))
                         .foregroundColor(.amarilloPrincipal)
                 }
 
-                // Botón Cola
                 Button(action: {
                     if queueViewModel.isInQueue(episodio: episodio) {
                         queueViewModel.removeEpisodio(episodio: episodio)
@@ -121,7 +117,6 @@ struct EpisodeDetailView: View {
                     }
                 }
 
-                // Botón Descarga
                 Button(action: {
                     if downloadedViewModel.isDownloaded(episodio: episodio) {
                         downloadedViewModel.removeDownload(episodio: episodio)
