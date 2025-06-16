@@ -5,6 +5,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.paradigmaapp.android.R
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.Color
 
 /**
  * Diapositiva 1: Bienvenida con animación e imagen.
@@ -44,6 +46,7 @@ fun OnboardingPage1(onScreenClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.secondaryContainer)
             .clickable(onClick = onScreenClick) // La pantalla entera es clickable
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -61,7 +64,7 @@ fun OnboardingPage1(onScreenClick: () -> Unit) {
             text = "Bienvenid@ a Paradigma Media",
             style = MaterialTheme.typography.displaySmall,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onPrimary
+            color = Color(0xFFDCB715)
         )
     }
 }

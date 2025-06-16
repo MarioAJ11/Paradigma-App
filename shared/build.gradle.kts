@@ -1,5 +1,6 @@
 import app.cash.sqldelight.gradle.SqlDelightExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
     alias(libs.plugins.androidLibrary)
@@ -15,7 +16,6 @@ configure<SqlDelightExtension> {
         }
     }
 }
-
 kotlin {
     androidTarget {
         compilations.all {
@@ -27,9 +27,18 @@ kotlin {
         }
     }
 
-    iosX64("iosX64") { binaries.framework { baseName = "shared"; isStatic = true } }
-    iosArm64("iosArm64") { binaries.framework { baseName = "shared"; isStatic = true } }
-    iosSimulatorArm64("iosSimulatorArm64") { binaries.framework { baseName = "shared"; isStatic = true } }
+    // Esta es la configuración mejorada para iOS
+    val xcf = XCFramework()
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach {
+        it.binaries.framework {
+            baseName = "shared"
+            xcf.add(this)
+        }
+    }
 
     sourceSets {
         commonMain.dependencies {
